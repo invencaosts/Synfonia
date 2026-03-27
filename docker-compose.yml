@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: db_usuarios_musicas
       POSTGRES_USER: musicas_user
-      POSTGRES_PASSWORD: ${DB_PASS:-SenhaForte@2024!}
+      POSTGRES_PASSWORD: ${DB_PASS}
       POSTGRES_INITDB_ARGS: "-c client_encoding=UTF8 -c timezone=America/Sao_Paulo"
     ports:
       - "5432:5432"
@@ -30,7 +30,7 @@ services:
     environment:
       MONGO_INITDB_DATABASE: musicas
       MONGO_INITDB_ROOT_USERNAME: mongo_user
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-mongo@123}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
     ports:
       - "27017:27017"
     volumes:
@@ -38,7 +38,7 @@ services:
     networks:
       - musicas_network
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017 -u mongo_user -p mongo@123 --authenticationDatabase admin
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017 -u ${MONGO_INITDB_ROOT_USERNAME} -p ${MONGO_PASSWORD} --authenticationDatabase admin
       interval: 10s
       timeout: 5s
       retries: 5
@@ -50,7 +50,7 @@ services:
     environment:
       SONAR_JDBC_URL: jdbc:postgresql://postgres:5432/sonarqube
       SONAR_JDBC_USERNAME: sonar_user
-      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASS:-sonar@123}
+      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASS}
       SONAR_ES_BOOTSTRAP_CHECKS_DISABLED: "true"
       SONAR_FORCEAUTHENTICATION: "false"
     ports:
