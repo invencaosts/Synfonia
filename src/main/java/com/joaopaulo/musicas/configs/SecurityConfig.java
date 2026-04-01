@@ -28,7 +28,7 @@ import java.util.List;
 public class SecurityConfig {
 
     @org.springframework.beans.factory.annotation.Value("${cors.allowed-origins:http://localhost:5173}")
-    private String[] allowedOrigins;
+    private String allowedOriginsRaw;
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
@@ -72,8 +72,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Usar setAllowedOriginPatterns é mais robusto para lidar com listas separadas por vírgula e curingas
-        configuration.setAllowedOriginPatterns(Arrays.asList(allowedOrigins));
+        // Dividir a string por vírgula e remover espaços para garantir que cada domínio seja tratado individualmente
+        configuration.setAllowedOriginPatterns(Arrays.stream(allowedOriginsRaw.split(","))
+                .map(String::trim)
+                .toList());
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         
         // Adicionando headers comuns para evitar bloqueios de pré-vôo (preflight)
