@@ -96,7 +96,7 @@ public class SecurityConfig {
         http
             .cors(withDefaults())
             .csrf(csrf -> csrf
-                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .csrfTokenRepository(csrfTokenRepository())
                 .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                 .ignoringRequestMatchers(
                         "/api/v1/auth/login", 
@@ -114,7 +114,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/musicas/search").permitAll()
                 .requestMatchers("/api/v1/musicas/**").authenticated()
                 .requestMatchers("/api/v1/spotify/**").authenticated()
-                .requestMatchers("/api/v1/usuarios/**").authenticated()
+                .requestMatchers("/api/v1/users/**", "/api/v1/usuarios/**").authenticated()
                 .requestMatchers("/api/v1/historico/**").authenticated()
                 .requestMatchers("/api/v1/playlists/**").authenticated()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
@@ -139,6 +139,18 @@ public class SecurityConfig {
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
+    }
+
+    private CookieCsrfTokenRepository csrfTokenRepository() {
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        // A partir do Spring Security 6.1+, podemos usar o CookieCustomizer
+        // Se a versão for anterior, o Spring pode reclamar, mas a maioria das libs modernas já suporta.
+        repository.setCookieCustomizer(cookie -> {
+            cookie.sameSite("None");
+            cookie.secure(true); // Obrigatório para SameSite=None
+            cookie.path("/");
+        });
+        return repository;
     }
 
     @Bean
