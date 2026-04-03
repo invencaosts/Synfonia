@@ -61,12 +61,23 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     private String getClientIP(HttpServletRequest request) {
-        // Captura o IP real se estiver atrás de um Proxy (Azure, ngrok, Nginx)
         String xfHeader = request.getHeader("X-Forwarded-For");
+        
         if (xfHeader == null || xfHeader.isEmpty()) {
             return request.getRemoteAddr();
         }
-        // O formato do header é "client, proxy1, proxy2...", pegamos o primeiro (cliente real)
-        return xfHeader.split(",")[0].trim();
+
+        // Para evitar Spoofing, pegamos apenas a primeira parte do cabeçalho
+        // Em um ambiente de produção real (Azure/AWS), o proxy deve estar configurado
+        // para sanitizar ou sobrescrever este header.
+        String clientIp = xfHeader.split(",")[0].trim();
+        
+        // Verificação básica: se o IP extraído for inválido ou muito longo, 
+        // falhamos para o RemoteAddr por segurança.
+        if (clientIp.length() > 45) { // IPv6 max length
+            return request.getRemoteAddr();
+        }
+        
+        return clientIp;
     }
 }

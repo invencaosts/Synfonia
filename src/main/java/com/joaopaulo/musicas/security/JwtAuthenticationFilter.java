@@ -34,22 +34,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         String token = null;
-        
-        // 1. Tentar extrair do Cookie (Preferencial para HttpOnly)
-        if (request.getCookies() != null) {
+
+        // 1. Tentar extrair do Header (Prioridade para APIs/Mobile)
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String headerToken = authHeader.substring(7);
+            if (jwtUtil.isTokenValidGracefully(headerToken)) {
+                token = headerToken;
+            }
+        }
+
+        // 2. Se não houver token válido no Header, tentar extrair do Cookie (Web Session)
+        if (token == null && request.getCookies() != null) {
             token = Arrays.stream(request.getCookies())
                     .filter(cookie -> "accessToken".equals(cookie.getName()))
                     .map(Cookie::getValue)
                     .findFirst()
                     .orElse(null);
-        }
-
-        // 2. Fallback para Header (Caso o cookie não esteja presente ou seja usado por clientes mobile/api)
-        if (token == null) {
-            String authHeader = request.getHeader("Authorization");
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                token = authHeader.substring(7);
-            }
         }
 
         if (token == null) {

@@ -49,7 +49,6 @@ public class PasswordResetService {
 
         try {
             emailService.sendResetPasswordEmail(usuario.getEmail(), code);
-            System.out.println("[DEBUG] Código gerado para " + normalizedEmail + ": " + code);
         } catch (Exception e) {
             throw new RuntimeException("Erro ao enviar e-mail de recuperação", e);
         }
@@ -60,24 +59,14 @@ public class PasswordResetService {
         String normalizedEmail = email.trim().toLowerCase();
         String normalizedCode = code.trim();
 
-        System.out.println("[DEBUG] Tentativa de verificação: " + normalizedEmail + " | " + normalizedCode);
-
         PasswordResetToken resetToken = tokenRepository.findByTokenAndUsuarioEmail(normalizedCode, normalizedEmail)
                 .orElseThrow(() -> {
-                    System.out.println("[DEBUG] Código/E-mail não encontrados no banco para: " + normalizedCode);
-                    // Log adicional para ver o que tem no banco
-                    tokenRepository.findAll().forEach(t -> 
-                        System.out.println("[DEBUG] Token no banco: " + t.getToken() + " p/ " + t.getUsuario().getEmail())
-                    );
                     return new RuntimeException("Código de recuperação inválido ou e-mail não confere");
                 });
 
         if (resetToken.isExpirado()) {
-            System.out.println("[DEBUG] Código expirado: " + normalizedCode);
             throw new RuntimeException("Código de recuperação expirado");
         }
-        
-        System.out.println("[DEBUG] Verificação bem-sucedida para: " + normalizedEmail);
     }
 
     @Transactional

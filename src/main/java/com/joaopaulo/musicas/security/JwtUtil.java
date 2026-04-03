@@ -78,6 +78,16 @@ public class JwtUtil {
         }
     }
 
+    public boolean isTokenValidGracefully(String token) {
+        try {
+            final Claims claims = extractAllClaims(token);
+            final Date expiration = claims.getExpiration();
+            return !expiration.before(new Date());
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
     public String extractEmail(String token) {
         return extractAllClaims(token).getSubject();
     }
