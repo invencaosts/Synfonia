@@ -39,6 +39,12 @@ public class PlaylistService {
     private long tokenExpiration;
 
     public Playlist create(Playlist playlist) {
+        // Hardening: Garante que o usuário logado seja sempre o dono da nova playlist, 
+        // independente do que vier no objeto original (Segurança por Definição).
+        playlist.setUserId(getLoggedUserId());
+        if (playlist.getTrackIds() == null) {
+            playlist.setTrackIds(new java.util.ArrayList<>());
+        }
         return playlistRepository.save(playlist);
     }
 

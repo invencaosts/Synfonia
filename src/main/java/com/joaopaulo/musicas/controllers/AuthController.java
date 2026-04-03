@@ -92,8 +92,6 @@ public class AuthController {
     }
 
     private ResponseCookie createCookie(HttpServletRequest request, String name, String value, long maxAge) {
-        // Determina se deve usar Secure (apenas HTTPS)
-        // Ativa se for HTTPS ou se estiver vindo de um proxy reverso seguro (como ngrok ou cloudflare)
         boolean isSecure = request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto"));
         
         // Em localhost (desenvolvimento), permitimos HTTP comum para facilitar testes
@@ -101,12 +99,16 @@ public class AuthController {
             isSecure = false;
         }
 
+        // Importante: SameSite=None EXIGE Secure=true. 
+        // Usamos None para produção (Cross-Domain) e Lax para desenvolvimento local.
+        String sameSitePolicy = isSecure ? "None" : "Lax";
+
         return ResponseCookie.from(name, value)
                 .httpOnly(true)
                 .secure(isSecure) 
                 .path("/")
                 .maxAge(maxAge)
-                .sameSite("Strict") // Mais seguro que Lax, impede CSRF de forma mais agressiva
+                .sameSite(sameSitePolicy)
                 .build();
     }
 }
