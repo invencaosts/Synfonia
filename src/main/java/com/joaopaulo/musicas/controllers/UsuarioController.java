@@ -41,10 +41,24 @@ public class UsuarioController {
         return ResponseEntity.ok(usuarioMapper.toResponse(usuario));
     }
 
+    @Operation(summary = "Atualiza os dados de identidade do perfil")
+    @PutMapping("/me")
+    public ResponseEntity<UsuarioResponse> updateProfile(@RequestBody Map<String, Object> profileData) {
+        var usuario = usuarioService.updateProfile(profileData);
+        return ResponseEntity.ok(usuarioMapper.toResponse(usuario));
+    }
+
     @Operation(summary = "Atualiza a foto de perfil")
     @PutMapping("/photo")
     public ResponseEntity<UsuarioResponse> updateProfilePicture(@RequestBody Map<String, String> photoData) {
         var usuario = usuarioService.updateProfilePicture(photoData.get("fotoPerfil"));
         return ResponseEntity.ok(usuarioMapper.toResponse(usuario));
+    }
+
+    @Operation(summary = "Desativa a conta do usuário")
+    @PostMapping("/me/deactivate")
+    public ResponseEntity<Void> deactivateAccount() {
+        usuarioService.deactivateAccount();
+        return ResponseEntity.noContent().build();
     }
 }

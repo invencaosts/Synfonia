@@ -1,5 +1,6 @@
 package com.joaopaulo.musicas.dtos.response;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,10 +11,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class LoginResponse {
+    @JsonIgnore
     private String token;
+    
+    @JsonIgnore
     private String refreshToken;
-    @Builder.Default
-    private String tipoToken = "Bearer";
-    private long expiraEm;
+    
     private UsuarioResponse usuario;
 }

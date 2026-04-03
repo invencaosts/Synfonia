@@ -1,6 +1,10 @@
 package com.joaopaulo.musicas.configs;
 
 import com.joaopaulo.musicas.security.JwtAuthenticationFilter;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,16 +13,20 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.OncePerRequestFilter;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
@@ -31,6 +39,7 @@ public class SecurityConfig {
     private String allowedOriginsRaw;
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final com.joaopaulo.musicas.security.RateLimitingFilter rateLimitingFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -46,10 +55,21 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(AbstractHttpConfigurer::disable)
+            // Habilitar CSRF para aplicações SPA usando Cookies
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .ignoringRequestMatchers(
+                        "/api/v1/auth/login", 
+                        "/api/v1/auth/register", 
+                        "/api/v1/auth/forgot-password", 
+                        "/api/v1/auth/verify-reset-code",
+                        "/api/v1/auth/reset-password"
+                )
+            )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated() // /me exige autenticação
                 .requestMatchers(HttpMethod.GET, "/api/v1/musicas/search").permitAll()
                 .requestMatchers(
                     "/swagger-ui/**",
@@ -64,7 +84,9 @@ public class SecurityConfig {
                 ).permitAll()
                 .anyRequest().authenticated()
             )
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class) // Rate Limit vem primeiro
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class);
 
         return http.build();
     }
@@ -72,29 +94,44 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Dividir a string por vírgula e remover espaços para garantir que cada domínio seja tratado individualmente
         configuration.setAllowedOriginPatterns(Arrays.stream(allowedOriginsRaw.split(","))
                 .map(String::trim)
                 .toList());
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         
-        // Adicionando headers comuns para evitar bloqueios de pré-vôo (preflight)
         configuration.setAllowedHeaders(Arrays.asList(
             "Authorization", 
             "Content-Type", 
             "Cache-Control", 
-            "New-Token",
+            "X-XSRF-TOKEN", 
             "Accept",
             "X-Requested-With",
             "Origin",
-            "Access-Control-Request-Method",
-            "Access-Control-Request-Headers"
+            "X-Rate-Limit-Remaining",
+            "X-Rate-Limit-Retry-After-Seconds"
         ));
         
-        configuration.setExposedHeaders(List.of("New-Token"));
+        configuration.setExposedHeaders(Arrays.asList(
+            "X-Rate-Limit-Remaining",
+            "X-Rate-Limit-Retry-After-Seconds"
+        ));
+        
         configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    // Filtro para garantir que o CSRF Token seja enviado em um cookie na primeira requisição
+    private static final class CsrfCookieFilter extends OncePerRequestFilter {
+        @Override
+        protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+                throws ServletException, IOException {
+            CsrfToken csrfToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+            if (csrfToken != null) {
+                csrfToken.getToken(); // Acessar o token força a persistência no cookie
+            }
+            filterChain.doFilter(request, response);
+        }
     }
 }

@@ -3,7 +3,6 @@ package com.joaopaulo.musicas.controllers;
 import com.joaopaulo.musicas.dtos.request.MusicSaveRequest;
 import com.joaopaulo.musicas.dtos.request.PlaylistRequest;
 import com.joaopaulo.musicas.dtos.request.SpotifyImportDataRequest;
-import com.joaopaulo.musicas.dtos.request.SpotifyImportRequest;
 import com.joaopaulo.musicas.entities.Playlist;
 import com.joaopaulo.musicas.services.PlaylistService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -115,14 +114,6 @@ public class PlaylistController {
             @Parameter(description = "ID da playlist (MongoDB)") @PathVariable String playlistId,
             @RequestBody List<MusicSaveRequest> requests) {
         return ResponseEntity.ok(playlistService.addTracks(playlistId, requests));
-    }
-
-    @Operation(summary = "Importar músicas do Spotify para uma playlist via Proxy")
-    @PostMapping("/{playlistId}/import-spotify")
-    public ResponseEntity<Playlist> importSpotify(
-            @Parameter(description = "ID da playlist (MongoDB)") @PathVariable String playlistId,
-            @RequestBody SpotifyImportRequest request) {
-        return ResponseEntity.ok(playlistService.importSpotifyTracks(playlistId, request.getSpotifyPlaylistId()));
     }
 
     @Operation(summary = "Importa uma playlist do Spotify enviando os dados diretamente do frontend (Bypass 403)")

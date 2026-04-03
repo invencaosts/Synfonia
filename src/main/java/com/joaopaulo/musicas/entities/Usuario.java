@@ -24,7 +24,6 @@ public class Usuario {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Email
     @NotBlank
     @Size(max = 255)
     @Column(nullable = false, unique = true)
@@ -33,9 +32,24 @@ public class Usuario {
     @NotBlank
     private String senha; // Sempre armazenada como hash BCrypt
 
-    @NotBlank
-    @Size(max = 100)
-    private String nomeCompleto;
+    @Column(unique = true, nullable = false)
+    private String username;
+
+    // Nick Customizável (H1) - Aceita letras, números e símbolos (sem emojis)
+    private String displayName;
+
+    // Nome Pessoal (Subtítulo) - Apenas letras e espaços
+    private String personalName;
+
+    @Builder.Default
+    @Column(columnDefinition = "boolean default true")
+    private Boolean showPersonalName = true;
+
+    @Builder.Default
+    @Column(columnDefinition = "boolean default true")
+    private Boolean showSpotifyActivity = true;
+
+    private LocalDateTime dataDesativacao;
 
     @NotNull
     @Builder.Default

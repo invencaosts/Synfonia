@@ -43,6 +43,7 @@ public class PlaylistService {
     }
 
     public Playlist update(String id, Playlist playlistDetails) {
+        checkPlaylistOwnership(id);
         Playlist playlist = playlistRepository.findById(id)
                 .orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
 
@@ -71,10 +72,12 @@ public class PlaylistService {
     }
 
     public void delete(String id) {
+        checkPlaylistOwnership(id);
         playlistRepository.deleteById(id);
     }
 
     public Playlist addTrack(String playlistId, MusicSaveRequest request) {
+        checkPlaylistOwnership(playlistId);
         Playlist playlist = playlistRepository.findById(playlistId)
                 .orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
         
@@ -91,6 +94,7 @@ public class PlaylistService {
     }
 
     public Playlist addTracks(String playlistId, List<MusicSaveRequest> requests) {
+        checkPlaylistOwnership(playlistId);
         Playlist playlist = playlistRepository.findById(playlistId)
                 .orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
         
@@ -112,6 +116,7 @@ public class PlaylistService {
     }
 
     public Playlist removeTrack(String playlistId, String trackId) {
+        checkPlaylistOwnership(playlistId);
         Playlist playlist = playlistRepository.findById(playlistId)
                 .orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
 
@@ -258,11 +263,6 @@ public class PlaylistService {
         throw new SpotifyApiException("Não foi possível obter token do Spotify");
     }
 
-    public Playlist importSpotifyTracks(String playlistId, String spotifyPlaylistId) {
-        // Método legado que buscava no backend (mantido como casca vazia ou para referência futura se o 403 sumir)
-        log.warn("Tentativa de importação via Backend (Legado) para {}. Recomendado usar import-data via Frontend.", spotifyPlaylistId);
-        return findById(playlistId).orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
-    }
 
     public Long getLoggedUserId() {
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
@@ -270,5 +270,17 @@ public class PlaylistService {
             throw new UnauthorizedException("Usuário não está autenticado");
         }
         return details.getId();
+    }
+
+    private void checkPlaylistOwnership(String playlistId) {
+        Playlist playlist = playlistRepository.findById(playlistId)
+                .orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
+        
+        Long loggedUserId = getLoggedUserId();
+        if (!playlist.getUserId().equals(loggedUserId)) {
+            log.warn("Tentativa de acesso não autorizado: Usuário {} tentou modificar a playlist {} do usuário {}", 
+                    loggedUserId, playlistId, playlist.getUserId());
+            throw new UnauthorizedException("Você não tem permissão para modificar esta playlist");
+        }
     }
 }
