@@ -26,10 +26,16 @@ public class HistoricoReproducaoService {
         log.info("Adicionando track {} ao histórico do usuário {}", trackId, userId);
 
         // Garante que a música está no nosso catálogo
-        if (request != null) {
-            musicService.saveCustomMusic(request);
-        } else {
-            musicService.saveFromApple(trackId);
+        try {
+            if (request != null && request.getTrackId() != null && request.getNome() != null) {
+                musicService.saveCustomMusic(request);
+            } else if (trackId != null && trackId.matches("\\d+")) {
+                // Tenta salvar da Apple apenas se o ID for numérico (padrão iTunes)
+                musicService.saveFromApple(trackId);
+            }
+        } catch (Exception e) {
+            log.warn("Não foi possível pré-salvar a música {} no catálogo: {}", trackId, e.getMessage());
+            // Continuamos mesmo sem pré-salvar, para não quebrar a experiência do usuário
         }
 
         // Se já existir no histórico, remove a antiga para colocar no topo

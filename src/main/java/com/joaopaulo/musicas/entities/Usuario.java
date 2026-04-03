@@ -64,7 +64,7 @@ public class Usuario {
     private Integer tentativasFalhas = 0;
     private LocalDateTime bloqueadoAte;
     
-    private Long favoriteTrackId;
+    private String favoriteTrackId;
     private String favoriteTrackName;
     private String favoriteTrackArtist;
     private String favoriteTrackCapaUrl;
@@ -74,6 +74,7 @@ public class Usuario {
     private String fotoPerfil;
 
     @Builder.Default
+    @Column(name = "username_changed")
     private boolean usernameChanged = false;
 
     @Column(updatable = false)

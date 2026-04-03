@@ -26,7 +26,7 @@ public class UsuarioService {
         Usuario usuario = getLoggedUser();
         
         if (favoriteData.containsKey("favoriteTrackId")) {
-            usuario.setFavoriteTrackId(Long.valueOf(favoriteData.get("favoriteTrackId").toString()));
+            usuario.setFavoriteTrackId((String) favoriteData.get("favoriteTrackId"));
         }
         usuario.setFavoriteTrackName((String) favoriteData.get("favoriteTrackName"));
         usuario.setFavoriteTrackArtist((String) favoriteData.get("favoriteTrackArtist"));

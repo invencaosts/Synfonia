@@ -24,7 +24,7 @@ public class UsuarioResponse {
     private java.time.LocalDateTime dataCriacao;
     private java.time.LocalDateTime ultimoLogin;
     
-    private Long favoriteTrackId;
+    private String favoriteTrackId;
     private String favoriteTrackName;
     private String favoriteTrackArtist;
     private String favoriteTrackCapaUrl;
