@@ -75,6 +75,27 @@ public class UsuarioService {
             usuario.setShowSpotifyActivity((Boolean) profileData.get("showSpotifyActivity"));
         }
         
+        if (profileData.containsKey("username")) {
+            String newUsername = (String) profileData.get("username");
+            if (newUsername != null && !newUsername.equals(usuario.getUsername())) {
+                if (usuario.isUsernameChanged()) {
+                    throw new IllegalStateException("Você já alterou seu nome de usuário uma vez e não pode alterá-lo novamente.");
+                }
+                
+                // Validação de formato básico (alfanumérico e underscore)
+                if (!newUsername.matches("^[a-zA-Z0-9_]{3,20}$")) {
+                    throw new IllegalArgumentException("Username deve ter entre 3 e 20 caracteres e conter apenas letras, números e underline.");
+                }
+                
+                if (usuarioRepository.existsByUsername(newUsername)) {
+                    throw new IllegalArgumentException("Este nome de usuário já está sendo utilizado.");
+                }
+                
+                usuario.setUsername(newUsername);
+                usuario.setUsernameChanged(true);
+            }
+        }
+        
         return usuarioRepository.save(usuario);
     }
 

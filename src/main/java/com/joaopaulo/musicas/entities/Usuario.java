@@ -73,6 +73,9 @@ public class Usuario {
     @Column(columnDefinition = "TEXT")
     private String fotoPerfil;
 
+    @Builder.Default
+    private boolean usernameChanged = false;
+
     @Column(updatable = false)
     private LocalDateTime dataCriacao;
 

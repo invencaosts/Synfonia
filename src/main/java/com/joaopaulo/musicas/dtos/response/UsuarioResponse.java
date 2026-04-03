@@ -31,4 +31,5 @@ public class UsuarioResponse {
     private String favoriteTrackPreviewUrl;
     
     private String fotoPerfil;
+    private boolean usernameChanged;
 }

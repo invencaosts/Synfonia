@@ -37,6 +37,7 @@ public interface UsuarioMapper {
                 .favoriteTrackCapaUrl(usuario.getFavoriteTrackCapaUrl())
                 .favoriteTrackPreviewUrl(usuario.getFavoriteTrackPreviewUrl())
                 .fotoPerfil(usuario.getFotoPerfil())
+                .usernameChanged(usuario.isUsernameChanged())
                 .build();
     }
 }
