@@ -72,10 +72,7 @@ public class SecurityConfig {
         
         config.setAllowedOriginPatterns(origins);
         
-        config.setAllowedHeaders(Arrays.asList(
-            "Authorization", "Content-Type", "Cache-Control", "X-XSRF-TOKEN", 
-            "Accept", "X-Requested-With", "Origin"
-        ));
+        config.setAllowedHeaders(List.of("*"));
         
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         
