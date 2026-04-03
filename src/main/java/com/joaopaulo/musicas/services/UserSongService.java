@@ -35,8 +35,8 @@ public class UserSongService {
     private final MusicService musicService;
     private final MusicMapper musicMapper;
 
-    public UserSong adicionarMusica(Long userId, com.joaopaulo.musicas.dtos.request.MusicSaveRequest request) {
-        validarPropriedadeDoUsuario(userId);
+    public UserSong adicionarMusica(com.joaopaulo.musicas.dtos.request.MusicSaveRequest request) {
+        Long userId = getLoggedUserId();
         String trackId = request.getTrackId();
         
         if (trackId == null || trackId.isBlank() || trackId.equalsIgnoreCase("undefined")) {
@@ -57,7 +57,6 @@ public class UserSongService {
         musicService.saveCustomMusic(request);
 
         UserSong userSong = UserSong.builder()
-
                 .userId(userId)
                 .trackId(trackId)
                 .source(request.getSource())
@@ -67,13 +66,13 @@ public class UserSongService {
         return userSongRepository.save(userSong);
     }
 
-    public void removerMusica(Long userId, String trackId) {
-        validarPropriedadeDoUsuario(userId);
+    public void removerMusica(String trackId) {
+        Long userId = getLoggedUserId();
         userSongRepository.deleteByUserIdAndTrackId(userId, trackId);
     }
 
-    public Long removerMusicasPorFonte(Long userId, MusicSource source) {
-        validarPropriedadeDoUsuario(userId);
+    public Long removerMusicasPorFonte(MusicSource source) {
+        Long userId = getLoggedUserId();
         
         // 1. Deleta pelo campo source explicitamente (funciona para novas importações)
         Long count = userSongRepository.deleteByUserIdAndSource(userId, source);
@@ -97,7 +96,6 @@ public class UserSongService {
         return count;
     }
 
-
     private boolean isSpotifyLikeId(String trackId) {
         if (trackId == null) return false;
         // IDs do Spotify são alfanuméricos (letras e números) de ~22 caracteres.
@@ -105,11 +103,8 @@ public class UserSongService {
         return trackId.length() > 10 && trackId.matches("^[a-zA-Z0-9]+$") && !trackId.matches("^\\d+$");
     }
 
-
-
-
-    public List<UserSongResponse> listarMusicas(Long userId) {
-        validarPropriedadeDoUsuario(userId);
+    public List<UserSongResponse> listarMusicas() {
+        Long userId = getLoggedUserId();
 
         if (!usuarioRepository.existsById(userId)) {
             throw new UsuarioNaoEncontradoException("Usuário não encontrado");
@@ -145,25 +140,16 @@ public class UserSongService {
                 .toList();
     }
 
-    public Optional<UserSong> verificarMusicaSalva(Long userId, String trackId) {
-        validarPropriedadeDoUsuario(userId);
+    public Optional<UserSong> verificarMusicaSalva(String trackId) {
+        Long userId = getLoggedUserId();
         return userSongRepository.findByUserIdAndTrackId(userId, trackId);
     }
 
-    private void validarPropriedadeDoUsuario(Long userId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-
-        if (auth == null || !(auth.getPrincipal() instanceof UsuarioDetails usuarioDetails)) {
-            throw new AccessDeniedException("Usuário não autenticado");
+    public Long getLoggedUserId() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof com.joaopaulo.musicas.security.UsuarioDetails details)) {
+            throw new com.joaopaulo.musicas.exceptions.UnauthorizedException("Usuário não está autenticado");
         }
-
-        boolean isAdmin = auth.getAuthorities().stream()
-                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
-
-        if (!isAdmin && !usuarioDetails.getId().equals(userId)) {
-            log.warn("Tentativa de IDOR: usuário {} tentou acessar dados do usuário {}",
-                    usuarioDetails.getId(), userId);
-            throw new IdorSecurityException("Você não tem permissão para acessar o perfil de outro usuário");
-        }
+        return details.getId();
     }
 }
