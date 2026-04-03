@@ -1,16 +1,20 @@
 package com.joaopaulo.musicas.configs;
 
 import com.joaopaulo.musicas.security.JwtAuthenticationFilter;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import com.joaopaulo.musicas.security.RateLimitingFilter;
+import com.joaopaulo.musicas.security.UserDetailsServiceImpl;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -21,29 +25,118 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
+
+import static org.springframework.security.config.Customizer.withDefaults;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    @org.springframework.beans.factory.annotation.Value("${cors.allowed-origins:http://localhost:5173}")
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final UserDetailsServiceImpl userDetailsService;
+    private final RateLimitingFilter rateLimitingFilter;
+
+    @Value("${cors.allowed-origins:http://localhost:5173}")
     private String allowedOriginsRaw;
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final com.joaopaulo.musicas.security.RateLimitingFilter rateLimitingFilter;
+    @Bean
+    @Order(Ordered.HIGHEST_PRECEDENCE)
+    public CorsFilter corsFilter() {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        CorsConfiguration config = new CorsConfiguration();
+        
+        config.setAllowCredentials(true);
+        
+        // Limpeza robusta das origens: remove caminhos (ex: /callback) e espaços
+        List<String> origins = Arrays.stream(allowedOriginsRaw.split(","))
+                .map(String::trim)
+                .map(this::cleanOrigin)
+                .filter(o -> !o.isEmpty())
+                .collect(Collectors.toList());
+        
+        config.setAllowedOriginPatterns(origins);
+        
+        config.setAllowedHeaders(Arrays.asList(
+            "Authorization", "Content-Type", "Cache-Control", "X-XSRF-TOKEN", 
+            "Accept", "X-Requested-With", "Origin"
+        ));
+        
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        
+        source.registerCorsConfiguration("/**", config);
+        return new CorsFilter(source);
+    }
+
+    private String cleanOrigin(String origin) {
+        if (origin == null || origin.isEmpty()) return "";
+        if (origin.startsWith("http")) {
+            int firstSlash = origin.indexOf("/", 8);
+            if (firstSlash != -1) {
+                return origin.substring(0, firstSlash);
+            }
+        }
+        return origin;
+    }
 
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .cors(withDefaults())
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+                .ignoringRequestMatchers(
+                        "/api/v1/auth/login", 
+                        "/api/v1/auth/register",
+                        "/api/v1/auth/refresh-token",
+                        "/api/v1/auth/forgot-password",
+                        "/api/v1/auth/reset-password",
+                        "/api/v1/auth/logout"
+                )
+            )
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/v1/musicas/search").permitAll()
+                .requestMatchers("/api/v1/musicas/**").authenticated()
+                .requestMatchers("/api/v1/spotify/**").authenticated()
+                .requestMatchers("/api/v1/usuarios/**").authenticated()
+                .requestMatchers("/api/v1/historico/**").authenticated()
+                .requestMatchers("/api/v1/playlists/**").authenticated()
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                .anyRequest().authenticated()
+            )
+            .authenticationProvider(authenticationProvider())
+            .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    @Bean
+    public AuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(userDetailsService);
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
     }
 
     @Bean
@@ -52,84 +145,17 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            // Habilitar CSRF para aplicações SPA usando Cookies
-            .csrf(csrf -> csrf
-                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                .ignoringRequestMatchers(
-                        "/api/v1/auth/login", 
-                        "/api/v1/auth/register", 
-                        "/api/v1/auth/forgot-password", 
-                        "/api/v1/auth/verify-reset-code",
-                        "/api/v1/auth/reset-password"
-                )
-            )
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated() // /me exige autenticação
-                .requestMatchers(HttpMethod.GET, "/api/v1/musicas/search").permitAll()
-                .requestMatchers(
-                    "/swagger-ui/**",
-                    "/swagger-ui.html",
-                    "/v3/api-docs/**",
-                    "/v3/api-docs",
-                    "/swagger-resources",
-                    "/swagger-resources/**",
-                    "/configuration/ui",
-                    "/configuration/security",
-                    "/webjars/**"
-                ).permitAll()
-                .anyRequest().authenticated()
-            )
-            .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class) // Rate Limit vem primeiro
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class);
-
-        return http.build();
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(Arrays.stream(allowedOriginsRaw.split(","))
-                .map(String::trim)
-                .toList());
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        
-        configuration.setAllowedHeaders(Arrays.asList(
-            "Authorization", 
-            "Content-Type", 
-            "Cache-Control", 
-            "X-XSRF-TOKEN", 
-            "Accept",
-            "X-Requested-With",
-            "Origin",
-            "X-Rate-Limit-Remaining",
-            "X-Rate-Limit-Retry-After-Seconds"
-        ));
-        
-        configuration.setExposedHeaders(Arrays.asList(
-            "X-Rate-Limit-Remaining",
-            "X-Rate-Limit-Retry-After-Seconds"
-        ));
-        
-        configuration.setAllowCredentials(true);
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }
-
-    // Filtro para garantir que o CSRF Token seja enviado em um cookie na primeira requisição
     private static final class CsrfCookieFilter extends OncePerRequestFilter {
         @Override
         protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
                 throws ServletException, IOException {
             CsrfToken csrfToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
             if (csrfToken != null) {
-                csrfToken.getToken(); // Acessar o token força a persistência no cookie
+                csrfToken.getToken();
             }
             filterChain.doFilter(request, response);
         }
