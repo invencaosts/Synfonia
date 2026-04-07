@@ -27,6 +27,14 @@ public class UsuarioRequest {
     private String confirmarSenha;
     
     @NotBlank
+    @Size(max = 50)
+    private String username;
+
+    @NotBlank
     @Size(max = 100)
-    private String nomeCompleto;
+    private String displayName;
+
+    @Size(max = 100)
+    private String personalName;
+
 }

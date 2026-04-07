@@ -51,6 +51,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/musicas/search").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/spotify/callback").permitAll()
                 .requestMatchers(
                     "/swagger-ui/**",
                     "/swagger-ui.html",
@@ -88,7 +89,8 @@ public class SecurityConfig {
             "X-Requested-With",
             "Origin",
             "Access-Control-Request-Method",
-            "Access-Control-Request-Headers"
+            "Access-Control-Request-Headers",
+            "ngrok-skip-browser-warning"
         ));
         
         configuration.setExposedHeaders(List.of("New-Token"));

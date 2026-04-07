@@ -41,7 +41,8 @@ public class HistoricoReproducaoService {
                 .dataReproducao(LocalDateTime.now())
                 .build();
 
-        historicoRepository.save(novoHistorico);
+        historicoRepository.save(java.util.Objects.requireNonNull(novoHistorico));
+
     }
 
     public List<HistoricoResponse> obterHistoricoRecente(Long userId) {

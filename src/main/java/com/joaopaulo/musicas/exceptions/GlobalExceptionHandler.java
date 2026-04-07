@@ -113,7 +113,8 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, String title, String message, HttpServletRequest request, Map<String, String> errors) {
-        return ResponseEntity.status(status)
+        return ResponseEntity.status(java.util.Objects.requireNonNull((org.springframework.http.HttpStatusCode) status))
+
                 .body(new ErrorResponse(
                         status.value(), 
                         title, 
@@ -122,4 +123,5 @@ public class GlobalExceptionHandler {
                         request.getRequestURI(), 
                         errors));
     }
+
 }

@@ -21,18 +21,40 @@ public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
 
+    public Usuario updateProfile(Map<String, Object> profileData) {
+        Usuario usuario = getLoggedUser();
+
+        if (profileData.containsKey("username")) {
+            String newUsername = profileData.get("username").toString();
+            if (!newUsername.equals(usuario.getUsername()) && usuarioRepository.existsByUsername(newUsername)) {
+                throw new com.joaopaulo.musicas.exceptions.EmailJaCadastradoException("Este username já está em uso.");
+            }
+            usuario.setUsername(newUsername);
+        }
+
+        if (profileData.containsKey("displayName")) usuario.setDisplayName(profileData.get("displayName").toString());
+        if (profileData.containsKey("personalName")) usuario.setPersonalName(profileData.get("personalName").toString());
+        if (profileData.containsKey("showPersonalName")) usuario.setShowPersonalName((Boolean) profileData.get("showPersonalName"));
+        if (profileData.containsKey("showSpotifyActivity")) usuario.setShowSpotifyActivity((Boolean) profileData.get("showSpotifyActivity"));
+
+        return usuarioRepository.save(java.util.Objects.requireNonNull(usuario));
+
+    }
+
+
     public Usuario updateFavoriteMusic(Map<String, Object> favoriteData) {
         Usuario usuario = getLoggedUser();
         
         if (favoriteData.containsKey("favoriteTrackId")) {
-            usuario.setFavoriteTrackId(Long.valueOf(favoriteData.get("favoriteTrackId").toString()));
+            usuario.setFavoriteTrackId(favoriteData.get("favoriteTrackId").toString());
         }
         usuario.setFavoriteTrackName((String) favoriteData.get("favoriteTrackName"));
         usuario.setFavoriteTrackArtist((String) favoriteData.get("favoriteTrackArtist"));
         usuario.setFavoriteTrackCapaUrl((String) favoriteData.get("favoriteTrackCapaUrl"));
         usuario.setFavoriteTrackPreviewUrl((String) favoriteData.get("favoriteTrackPreviewUrl"));
         
-        return usuarioRepository.save(usuario);
+        return usuarioRepository.save(java.util.Objects.requireNonNull(usuario));
+
     }
 
     public void removeFavoriteMusic() {
@@ -42,13 +64,15 @@ public class UsuarioService {
         usuario.setFavoriteTrackArtist(null);
         usuario.setFavoriteTrackCapaUrl(null);
         usuario.setFavoriteTrackPreviewUrl(null);
-        usuarioRepository.save(usuario);
+        usuarioRepository.save(java.util.Objects.requireNonNull(usuario));
+
     }
 
     public Usuario updateProfilePicture(String fotoPerfil) {
         Usuario usuario = getLoggedUser();
         usuario.setFotoPerfil(fotoPerfil);
-        return usuarioRepository.save(usuario);
+        return usuarioRepository.save(java.util.Objects.requireNonNull(usuario));
+
     }
 
     public Usuario getMe() {
@@ -60,7 +84,8 @@ public class UsuarioService {
         if (auth == null || !(auth.getPrincipal() instanceof UsuarioDetails details)) {
             throw new UnauthorizedException("Usuário não está autenticado");
         }
-        return usuarioRepository.findById(details.getId())
+        return usuarioRepository.findById(java.util.Objects.requireNonNull(details.getId()))
+
                 .orElseThrow(() -> new UsuarioNaoEncontradoException("Usuário não encontrado"));
     }
 }

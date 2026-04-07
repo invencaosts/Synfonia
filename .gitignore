@@ -56,6 +56,7 @@ setup_local.sh
 setup-local.ps1
 delete_temp.bat
 cleanup.sh
+compile_log.txt
 
 ### Sensitive and Data ###
 .env
@@ -80,4 +81,5 @@ Thumbs.db
 
 ### Database ###
 create_db_local.sql
+create_db.sql
 *.sql.local

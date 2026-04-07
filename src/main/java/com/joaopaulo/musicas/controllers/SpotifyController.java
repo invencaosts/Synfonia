@@ -7,8 +7,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -55,8 +55,10 @@ public class SpotifyController {
             SpotifyTokenResponse response = restClient.post()
                     .uri("https://accounts.spotify.com/api/token")
                     .header("Authorization", authHeader)
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .contentType(java.util.Objects.requireNonNull(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED))
                     .body(formData)
+
+
                     .retrieve()
                     .body(SpotifyTokenResponse.class);
 

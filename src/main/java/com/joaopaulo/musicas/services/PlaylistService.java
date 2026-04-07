@@ -2,22 +2,22 @@ package com.joaopaulo.musicas.services;
 
 import com.joaopaulo.musicas.dtos.request.MusicSaveRequest;
 import com.joaopaulo.musicas.entities.Playlist;
-import com.joaopaulo.musicas.enums.MusicSource;
 import com.joaopaulo.musicas.exceptions.PlaylistNotFoundException;
 import com.joaopaulo.musicas.exceptions.SpotifyApiException;
 import com.joaopaulo.musicas.exceptions.UnauthorizedException;
 import com.joaopaulo.musicas.repositories.PlaylistRepository;
+import com.joaopaulo.musicas.security.UsuarioDetails;
+import com.joaopaulo.musicas.dtos.request.SpotifyImportDataRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientResponseException;
-
-import java.util.ArrayList;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -39,11 +39,11 @@ public class PlaylistService {
     private long tokenExpiration;
 
     public Playlist create(Playlist playlist) {
-        return playlistRepository.save(playlist);
+        return playlistRepository.save(Objects.requireNonNull(playlist));
     }
 
     public Playlist update(String id, Playlist playlistDetails) {
-        Playlist playlist = playlistRepository.findById(id)
+        Playlist playlist = playlistRepository.findById(Objects.requireNonNull(id))
                 .orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
 
         if (playlistDetails.getNome() != null) playlist.setNome(playlistDetails.getNome());
@@ -51,7 +51,7 @@ public class PlaylistService {
         playlist.setPublico(playlistDetails.isPublico());
         if (playlistDetails.getCapaUrl() != null) playlist.setCapaUrl(playlistDetails.getCapaUrl());
 
-        return playlistRepository.save(playlist);
+        return playlistRepository.save(Objects.requireNonNull(playlist));
     }
 
     public List<Playlist> findAllByUserId(Long userId) {
@@ -63,35 +63,34 @@ public class PlaylistService {
     }
 
     public Optional<Playlist> findById(String id) {
-        return playlistRepository.findById(id);
+        return playlistRepository.findById(Objects.requireNonNull(id));
     }
 
     public Playlist save(Playlist playlist) {
-        return playlistRepository.save(playlist);
+        return playlistRepository.save(Objects.requireNonNull(playlist));
     }
 
     public void delete(String id) {
-        playlistRepository.deleteById(id);
+        playlistRepository.deleteById(Objects.requireNonNull(id));
     }
 
     public Playlist addTrack(String playlistId, MusicSaveRequest request) {
-        Playlist playlist = playlistRepository.findById(playlistId)
+        Playlist playlist = playlistRepository.findById(Objects.requireNonNull(playlistId))
                 .orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
         
-        String trackId = request.getTrackId();
+        String trackId = Objects.requireNonNull(request.getTrackId());
         
-        // Garante que a música seja salva no BD (pra suportar Spotify)
         musicService.saveCustomMusic(request);
 
         if (!playlist.getTrackIds().contains(trackId)) {
             playlist.getTrackIds().add(trackId);
         }
 
-        return playlistRepository.save(playlist);
+        return playlistRepository.save(Objects.requireNonNull(playlist));
     }
 
     public Playlist addTracks(String playlistId, List<MusicSaveRequest> requests) {
-        Playlist playlist = playlistRepository.findById(playlistId)
+        Playlist playlist = playlistRepository.findById(Objects.requireNonNull(playlistId))
                 .orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
         
         if (playlist.getTrackIds() == null) {
@@ -99,7 +98,7 @@ public class PlaylistService {
         }
         
         for (var request : requests) {
-            String trackId = request.getTrackId();
+            String trackId = Objects.requireNonNull(request.getTrackId());
             musicService.saveCustomMusic(request);
             if (!playlist.getTrackIds().contains(trackId)) {
                 playlist.getTrackIds().add(trackId);
@@ -108,56 +107,67 @@ public class PlaylistService {
 
         log.info("[Import Diagnostic] Finalizando addTracks. Playlist {} agora tem {} músicas.", 
                 playlistId, playlist.getTrackIds().size());
-        return playlistRepository.save(playlist);
+        return playlistRepository.save(Objects.requireNonNull(playlist));
     }
 
     public Playlist removeTrack(String playlistId, String trackId) {
-        Playlist playlist = playlistRepository.findById(playlistId)
+        Playlist playlist = playlistRepository.findById(Objects.requireNonNull(playlistId))
                 .orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
 
-        playlist.getTrackIds().remove(trackId);
+        playlist.getTrackIds().remove(Objects.requireNonNull(trackId));
 
-        return playlistRepository.save(playlist);
+        return playlistRepository.save(Objects.requireNonNull(playlist));
+    }
+
+    public Long getLoggedUserId() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UsuarioDetails details)) {
+            throw new UnauthorizedException("Usuário não está autenticado");
+        }
+        return details.getId();
+    }
+
+    public Playlist importSpotifyTracks(String playlistId, String spotifyPlaylistId) {
+        String token = getAppAccessToken();
+        List<com.joaopaulo.musicas.dtos.request.SpotifyImportDataRequest.SpotifyTrackData> tracks = fetchSpotifyTracks(spotifyPlaylistId, token);
+        
+        List<MusicSaveRequest> musicRequests = tracks.stream()
+                .map(t -> MusicSaveRequest.builder()
+                        .trackId(t.getId())
+                        .nome(t.getName())
+                        .artista(t.getArtist())
+                        .album(t.getAlbum())
+                        .capaUrl(t.getCapaUrl())
+                        .uri(t.getUri())
+                        .source(com.joaopaulo.musicas.enums.MusicSource.SPOTIFY)
+                        .build())
+                .toList();
+        
+        return addTracks(playlistId, musicRequests);
     }
 
     @org.springframework.transaction.annotation.Transactional
-    public Playlist importPlaylistData(com.joaopaulo.musicas.dtos.request.SpotifyImportDataRequest request) {
+    public Playlist importPlaylistData(SpotifyImportDataRequest request) {
         Long userId = getLoggedUserId();
+        List<com.joaopaulo.musicas.dtos.request.SpotifyImportDataRequest.SpotifyTrackData> tracks;
         
-        List<com.joaopaulo.musicas.dtos.request.SpotifyImportDataRequest.SpotifyTrackData> tracks = request.getTracks();
-        log.info("[Import Diagnostic] Recebidas {} músicas do Frontend para a playlist {}", 
-                tracks != null ? tracks.size() : 0, 
-                request.getName());
-        
-        if (tracks != null && !tracks.isEmpty()) {
-            var first = tracks.get(0);
-            log.info("[Import Diagnostic] Exemplo da primeira música: ID={}, Nome={}, Artista={}, URI={}", 
-                    first.getId(), first.getName(), first.getArtist(), first.getUri());
-        }
-        
-            // TENTATIVA ÚNICA: Usando o token do usuário (se fornecido)
-            if (request.getAccessToken() != null && !request.getAccessToken().isBlank()) {
+        if (request.getTracks() != null && !request.getTracks().isEmpty()) {
+            tracks = request.getTracks();
+            log.info("[Import] Usando {} músicas enviadas diretamente pelo frontend (Bypass).", tracks.size());
+        } else {
+            try {
+                tracks = fetchSpotifyTracks(request.getSpotifyPlaylistId(), request.getAccessToken());
+            } catch (Exception e) {
+                log.warn("[Import] Falha ao buscar músicas com token do usuário. Tentando com token do App.");
                 try {
-                    log.info("[Import] Tentativa de recuperação no Backend usando User Token...");
-                    tracks = fetchSpotifyTracks(request.getSpotifyPlaylistId(), request.getAccessToken());
-                } catch (Exception e) {
-                    log.error("[Import] Falha na recuperação via Backend para {}: {}", request.getSpotifyPlaylistId(), e.getMessage());
-                    throw new SpotifyApiException("O Spotify negou acesso a esta playlist tanto com seu token quanto com o do servidor. Verifique se ela é pública.", e);
-                }
-            } else {
-                // Se não temos token de usuário, tentamos o App Token como último recurso (apenas para playlists 100% públicas)
-                try {
-                    log.info("[Import] Backend tentando App Token (Client Credentials) para playlist pública...");
-                    tracks = fetchSpotifyTracks(request.getSpotifyPlaylistId(), getAppAccessToken());
+                    String appToken = getAppAccessToken();
+                    tracks = fetchSpotifyTracks(request.getSpotifyPlaylistId(), appToken);
                 } catch (Exception e2) {
                     log.error("[Import] Falha total na recuperação: {}", e2.getMessage());
                     throw new SpotifyApiException("Spotify negou acesso (403/404). Verifique se o ID está correto ou se a playlist é pública.", e2);
                 }
             }
-
-        log.info("Importando playlist '{}' do Spotify ({} músicas)", 
-                request.getName(), 
-                tracks != null ? tracks.size() : 0);
+        }
 
         Playlist playlist = Playlist.builder()
                 .nome(request.getName())
@@ -170,7 +180,7 @@ public class PlaylistService {
                 .trackIds(new java.util.ArrayList<>())
                 .build();
 
-        Playlist savedPlaylist = playlistRepository.save(playlist);
+        Playlist savedPlaylist = playlistRepository.save(Objects.requireNonNull(playlist));
 
         if (tracks != null && !tracks.isEmpty()) {
             List<MusicSaveRequest> musicRequests = tracks.stream()
@@ -199,7 +209,7 @@ public class PlaylistService {
                     .uri(url)
                     .header("Authorization", "Bearer " + token)
                     .retrieve()
-                    .body(com.fasterxml.jackson.databind.JsonNode.class);
+                    .body(JsonNode.class);
             
             java.util.List<com.joaopaulo.musicas.dtos.request.SpotifyImportDataRequest.SpotifyTrackData> tracks = new java.util.ArrayList<>();
             if (response != null && response.has("items")) {
@@ -214,7 +224,7 @@ public class PlaylistService {
                             .artist(trackNode.get("artists").get(0).get("name").asText())
                             .album(albumNode.get("name").asText())
                             .capaUrl(albumNode.get("images").has(0) ? 
-                                    albumNode.get("images").get(0).get("url").asText() : null)
+                                     albumNode.get("images").get(0).get("url").asText() : null)
                             .uri(trackNode.get("uri").asText())
                             .build());
                 }
@@ -242,10 +252,10 @@ public class PlaylistService {
             var response = restClient.post()
                     .uri("https://accounts.spotify.com/api/token")
                     .header("Authorization", "Basic " + auth)
-                    .contentType(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED)
+                    .contentType(Objects.requireNonNull(org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED))
                     .body("grant_type=client_credentials")
                     .retrieve()
-                    .body(com.fasterxml.jackson.databind.JsonNode.class);
+                    .body(JsonNode.class);
 
             if (response != null && response.has("access_token")) {
                 cachedAppToken = response.get("access_token").asText();
@@ -253,22 +263,8 @@ public class PlaylistService {
                 return cachedAppToken;
             }
         } catch (Exception e) {
-            log.error("Falha ao obter token do Spotify via Client Credentials: {}", e.getMessage());
+            log.error("Erro ao obter App Access Token: {}", e.getMessage());
         }
-        throw new SpotifyApiException("Não foi possível obter token do Spotify");
-    }
-
-    public Playlist importSpotifyTracks(String playlistId, String spotifyPlaylistId) {
-        // Método legado que buscava no backend (mantido como casca vazia ou para referência futura se o 403 sumir)
-        log.warn("Tentativa de importação via Backend (Legado) para {}. Recomendado usar import-data via Frontend.", spotifyPlaylistId);
-        return findById(playlistId).orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
-    }
-
-    public Long getLoggedUserId() {
-        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getPrincipal() instanceof com.joaopaulo.musicas.security.UsuarioDetails details)) {
-            throw new UnauthorizedException("Usuário não está autenticado");
-        }
-        return details.getId();
+        return null;
     }
 }

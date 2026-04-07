@@ -13,17 +13,23 @@ import lombok.NoArgsConstructor;
 public class UsuarioResponse {
     private Long id;
     private String email;
-    private String nomeCompleto;
+    private String username;
+    private String displayName;
+    private String personalName;
+    private boolean showPersonalName;
+    private boolean showSpotifyActivity;
+
     private Usuario.Papel papel;
     private boolean ativo;
     private java.time.LocalDateTime dataCriacao;
     private java.time.LocalDateTime ultimoLogin;
     
-    private Long favoriteTrackId;
+    private String favoriteTrackId;
     private String favoriteTrackName;
     private String favoriteTrackArtist;
     private String favoriteTrackCapaUrl;
     private String favoriteTrackPreviewUrl;
     
     private String fotoPerfil;
+
 }

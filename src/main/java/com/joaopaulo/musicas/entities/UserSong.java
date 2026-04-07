@@ -31,4 +31,14 @@ public class UserSong {
     @Indexed
     private LocalDateTime dataAdicao;
 
+    // Campos para facilitar ordenação server-side com paginação
+    @Indexed
+    private String trackName;
+
+    @Indexed
+    private String artistName;
+
+    @Indexed
+    private String albumName;
+
 }

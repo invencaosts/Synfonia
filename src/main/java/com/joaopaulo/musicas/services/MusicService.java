@@ -12,14 +12,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.ResourceAccessException;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
+
 
 @Service
 @RequiredArgsConstructor
@@ -60,7 +56,8 @@ public class MusicService {
     }
 
     public MusicEntity findById(String id) {
-        return musicRepository.findById(id)
+        return musicRepository.findById(java.util.Objects.requireNonNull(id))
+
                 .orElseGet(() -> {
                     log.info("Música {} não encontrada no banco. Tentando recuperar da Apple via Lookup.", id);
                     return fetchByTrackIdFromApple(id);
@@ -69,7 +66,8 @@ public class MusicService {
 
     // Novo método para quando REALMENTE precisamos tentar um fallback de preview
     public MusicEntity findByIdWithPreviewFallback(String id) {
-        return musicRepository.findById(id)
+        return musicRepository.findById(java.util.Objects.requireNonNull(id))
+
                 .map(entity -> {
                     if (entity.getPreviewUrl() == null || entity.getPreviewUrl().isEmpty()) {
                         log.info("Solicitado fallback de preview para música {}.", id);
@@ -108,7 +106,8 @@ public class MusicService {
             if (wrapper != null && wrapper.getResults() != null && !wrapper.getResults().isEmpty()) {
                 MusicEntity entity = musicMapper.toEntity(wrapper.getResults().get(0));
                 log.info("Música {} recuperada com sucesso da Apple. Salvando no catálogo.", trackId);
-                return musicRepository.save(entity);
+                return musicRepository.save(java.util.Objects.requireNonNull(entity));
+
             }
         } catch (Exception e) {
             log.warn("Falha ao tentar recuperar metadados da música {} na Apple: {}", trackId, e.getMessage());
@@ -117,12 +116,14 @@ public class MusicService {
     }
 
     public MusicEntity saveFromApple(String trackId) {
-        return musicRepository.findById(trackId)
+        return musicRepository.findById(java.util.Objects.requireNonNull(trackId))
+
                 .orElseGet(() -> fetchByTrackIdFromApple(trackId));
     }
 
     public MusicEntity saveCustomMusic(com.joaopaulo.musicas.dtos.request.MusicSaveRequest request) {
-        return musicRepository.findById(request.getTrackId())
+        return musicRepository.findById(java.util.Objects.requireNonNull(request.getTrackId()))
+
                 .orElseGet(() -> {
                     MusicEntity entity = MusicEntity.builder()
                             .id(request.getTrackId())
@@ -136,7 +137,8 @@ public class MusicService {
                             .source(request.getSource() != null ? request.getSource() : com.joaopaulo.musicas.enums.MusicSource.SPOTIFY)
                             .build();
                     log.info("Música personalizada (ex: Spotify) {} salva no catálogo.", request.getTrackId());
-                    return musicRepository.save(entity);
+                    return musicRepository.save(java.util.Objects.requireNonNull(entity));
+
                 });
     }
 

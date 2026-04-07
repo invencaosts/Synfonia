@@ -34,8 +34,24 @@ public class Usuario {
     private String senha; // Sempre armazenada como hash BCrypt
 
     @NotBlank
+    @Size(max = 50)
+    @Column(nullable = false, unique = true)
+    private String username;
+
+    @NotBlank
     @Size(max = 100)
-    private String nomeCompleto;
+    @Column(nullable = false)
+    private String displayName;
+
+    @Size(max = 100)
+    @Column(name = "nome_completo")
+    private String personalName;
+
+    @Builder.Default
+    private boolean showPersonalName = true;
+
+    @Builder.Default
+    private boolean showSpotifyActivity = true;
 
     @NotNull
     @Builder.Default
@@ -44,13 +60,17 @@ public class Usuario {
     @Builder.Default
     private boolean ativo = true;
 
+    @Builder.Default
+    private boolean usernameChanged = false;
+
     private LocalDateTime ultimoLogin;
+    private LocalDateTime dataDesativacao;
 
     @Builder.Default
     private Integer tentativasFalhas = 0;
     private LocalDateTime bloqueadoAte;
     
-    private Long favoriteTrackId;
+    private String favoriteTrackId;
     private String favoriteTrackName;
     private String favoriteTrackArtist;
     private String favoriteTrackCapaUrl;

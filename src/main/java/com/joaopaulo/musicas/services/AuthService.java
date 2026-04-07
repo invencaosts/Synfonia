@@ -55,6 +55,11 @@ public class AuthService {
             throw new EmailJaCadastradoException("Este e-mail já está em uso por outra conta");
         }
 
+        if (usuarioRepository.existsByUsername(request.getUsername())) {
+            throw new EmailJaCadastradoException("Este usuário (@" + request.getUsername() + ") já está em uso");
+        }
+
+
         Usuario usuario = usuarioMapper.toEntity(request);
         usuario.setSenha(passwordEncoder.encode(request.getSenha()));
         usuario.setAtivo(true);

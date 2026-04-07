@@ -21,7 +21,11 @@ public interface UsuarioMapper {
         return UsuarioResponse.builder()
                 .id(usuario.getId())
                 .email(usuario.getEmail())
-                .nomeCompleto(usuario.getNomeCompleto())
+                .username(usuario.getUsername())
+                .displayName(usuario.getDisplayName())
+                .personalName(usuario.getPersonalName())
+                .showPersonalName(usuario.isShowPersonalName())
+                .showSpotifyActivity(usuario.isShowSpotifyActivity())
                 .papel(usuario.getPapel())
                 .ativo(usuario.isAtivo())
                 .dataCriacao(usuario.getDataCriacao())
@@ -33,5 +37,6 @@ public interface UsuarioMapper {
                 .favoriteTrackPreviewUrl(usuario.getFavoriteTrackPreviewUrl())
                 .fotoPerfil(usuario.getFotoPerfil())
                 .build();
+
     }
 }
