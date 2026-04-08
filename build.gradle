@@ -84,7 +84,7 @@ sonarqube {
 	properties {
 		property "sonar.projectKey", System.getenv("SONAR_PROJECT_KEY") ?: "musicas-backend"
 		property "sonar.host.url", System.getenv("SONAR_HOST_URL") ?: "http://localhost:9000"
-		property "sonar.token", System.getenv("SONAR_TOKEN") ?: "sqa_dca77116767f9877b89dbc45d76a3ce3852767d9"
+		property "sonar.token", System.getenv("SONAR_TOKEN") ?: ""
 		property "sonar.gradle.skipCompile", "true"
 	}
 }
