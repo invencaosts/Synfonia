@@ -6,8 +6,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.web.client.RestClient;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
+
+
 
 @Configuration
 public class RestClientConfig {
@@ -17,10 +17,12 @@ public class RestClientConfig {
     public RestClient restClient() { // Removi o parâmetro daqui
         // 1. Criamos o conversor para aceitar o formato da Apple
         MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter();
-        converter.setSupportedMediaTypes(Arrays.asList(
-                MediaType.APPLICATION_JSON,
-                new MediaType("text", "javascript", StandardCharsets.UTF_8)
-        ));
+        java.util.List<MediaType> mediaTypes = new java.util.ArrayList<>();
+        mediaTypes.add(MediaType.APPLICATION_JSON);
+        mediaTypes.add(new MediaType("text", "javascript", java.util.Objects.requireNonNull(java.nio.charset.StandardCharsets.UTF_8)));
+        converter.setSupportedMediaTypes(mediaTypes);
+
+
 
         // 2. Criamos o Builder manualmente e buildamos o RestClient
         return RestClient.builder()

@@ -39,5 +39,6 @@ public interface UsuarioMapper {
                 .fotoPerfil(usuario.getFotoPerfil())
                 .usernameChanged(usuario.isUsernameChanged())
                 .build();
+
     }
 }

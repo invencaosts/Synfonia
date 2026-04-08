@@ -20,6 +20,14 @@ public class UsuarioController {
     private final UsuarioService usuarioService;
     private final UsuarioMapper usuarioMapper;
 
+    @Operation(summary = "Atualiza os dados de identidade do perfil (displayName, username, personalName, etc)")
+    @PutMapping("/me")
+    public ResponseEntity<UsuarioResponse> updateProfile(@RequestBody Map<String, Object> profileData) {
+        var usuario = usuarioService.updateProfile(profileData);
+        return ResponseEntity.ok(usuarioMapper.toResponse(usuario));
+    }
+
+
     @Operation(summary = "Atualiza a música favorita do perfil")
     @PutMapping("/me/favorite-music")
     public ResponseEntity<UsuarioResponse> updateFavoriteMusic(@RequestBody Map<String, Object> favoriteData) {

@@ -56,7 +56,8 @@ public class MusicService {
 
     @SuppressWarnings("null")
     public MusicEntity findById(String id) {
-        return musicRepository.findById(id)
+        return musicRepository.findById(java.util.Objects.requireNonNull(id))
+
                 .orElseGet(() -> {
                     log.info("Música {} não encontrada no banco. Tentando recuperar da Apple via Lookup.", id);
                     return fetchByTrackIdFromApple(id);
@@ -66,7 +67,8 @@ public class MusicService {
     // Novo método para quando REALMENTE precisamos tentar um fallback de preview
     @SuppressWarnings("null")
     public MusicEntity findByIdWithPreviewFallback(String id) {
-        return musicRepository.findById(id)
+        return musicRepository.findById(java.util.Objects.requireNonNull(id))
+
                 .map(entity -> {
                     if (entity.getPreviewUrl() == null || entity.getPreviewUrl().isEmpty()) {
                         log.info("Solicitado fallback de preview para música {}.", id);
@@ -116,13 +118,15 @@ public class MusicService {
 
     @SuppressWarnings("null")
     public MusicEntity saveFromApple(String trackId) {
-        return musicRepository.findById(trackId)
+        return musicRepository.findById(java.util.Objects.requireNonNull(trackId))
+
                 .orElseGet(() -> fetchByTrackIdFromApple(trackId));
     }
 
     @SuppressWarnings("null")
     public MusicEntity saveCustomMusic(com.joaopaulo.musicas.dtos.request.MusicSaveRequest request) {
-        return musicRepository.findById(request.getTrackId())
+        return musicRepository.findById(java.util.Objects.requireNonNull(request.getTrackId()))
+
                 .orElseGet(() -> {
                     MusicEntity entity = MusicEntity.builder()
                             .id(request.getTrackId())

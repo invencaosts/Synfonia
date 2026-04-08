@@ -37,7 +37,8 @@ public class UserSongService {
             throw new IllegalArgumentException("ID da música inválido");
         }
 
-        if (!usuarioRepository.existsById(userId)) {
+        if (!usuarioRepository.existsById(java.util.Objects.requireNonNull(userId))) {
+
             throw new UsuarioNaoEncontradoException("Usuário não encontrado");
         }
 
@@ -58,9 +59,13 @@ public class UserSongService {
                 .artistName(request.getArtista())
                 .albumName(request.getAlbum())
                 .dataAdicao(LocalDateTime.now())
+                .trackName(request.getNome())
+                .artistName(request.getArtista())
+                .albumName(request.getAlbum())
                 .build();
 
-        return userSongRepository.save(userSong);
+        return userSongRepository.save(java.util.Objects.requireNonNull(userSong));
+
     }
 
     public void removerMusica(String trackId) {
