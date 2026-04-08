@@ -22,27 +22,6 @@ public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
 
-    public Usuario updateProfile(Map<String, Object> profileData) {
-        Usuario usuario = getLoggedUser();
-
-        if (profileData.containsKey("username")) {
-            String newUsername = profileData.get("username").toString();
-            if (!newUsername.equals(usuario.getUsername()) && usuarioRepository.existsByUsername(newUsername)) {
-                throw new com.joaopaulo.musicas.exceptions.EmailJaCadastradoException("Este username já está em uso.");
-            }
-            usuario.setUsername(newUsername);
-        }
-
-        if (profileData.containsKey("displayName")) usuario.setDisplayName(profileData.get("displayName").toString());
-        if (profileData.containsKey("personalName")) usuario.setPersonalName(profileData.get("personalName").toString());
-        if (profileData.containsKey("showPersonalName")) usuario.setShowPersonalName((Boolean) profileData.get("showPersonalName"));
-        if (profileData.containsKey("showSpotifyActivity")) usuario.setShowSpotifyActivity((Boolean) profileData.get("showSpotifyActivity"));
-
-        return usuarioRepository.save(java.util.Objects.requireNonNull(usuario));
-
-    }
-
-
     public Usuario updateFavoriteMusic(Map<String, Object> favoriteData) {
         Usuario usuario = getLoggedUser();
         
@@ -139,7 +118,7 @@ public class UsuarioService {
             (cp >= 0x1F600 && cp <= 0x1F64F) || // Emoticons
             (cp >= 0x1F300 && cp <= 0x1F5FF) || // Misc Symbols and Pictographs
             (cp >= 0x1F680 && cp <= 0x1F6FF) || // Transport and Map
-            (cp >= 0x2600 && cp <= 0x26FF)   || // Misc Symbols
+            (cp >= 0x2600 && cp <= 0x26FF)   || // Misc symbols
             (cp >= 0x2700 && cp <= 0x27BF)   || // Dingbats
             (cp >= 0xFE00 && cp <= 0xFE0F)   || // Variation Selectors
             (cp >= 0x1F900 && cp <= 0x1F9FF)    // Supplemental Symbols and Pictographs
