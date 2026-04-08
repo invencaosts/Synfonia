@@ -3,14 +3,15 @@ package com.joaopaulo.musicas.controllers;
 import com.joaopaulo.musicas.entities.UserSong;
 import com.joaopaulo.musicas.enums.MusicSource;
 import com.joaopaulo.musicas.services.UserSongService;
-
+import com.joaopaulo.musicas.dtos.response.UserSongResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/users/me/songs")
@@ -41,10 +42,14 @@ public class UserSongController {
         return ResponseEntity.ok(count);
     }
 
-    @Operation(summary = "Listar todas as músicas salvas pelo usuário logado")
+    @Operation(summary = "Listar músicas salvas pelo usuário logado com busca e paginação")
     @GetMapping
-    public ResponseEntity<List<com.joaopaulo.musicas.dtos.response.UserSongResponse>> listarMusicas() {
-        List<com.joaopaulo.musicas.dtos.response.UserSongResponse> musicas = userSongService.listarMusicas();
+    public ResponseEntity<Page<UserSongResponse>> listarMusicas(
+            @RequestParam(value = "q", required = false) String searchTerm,
+            @PageableDefault(size = 50, sort = "dataAdicao,desc") Pageable pageable) {
+        
+        Long userId = userSongService.getLoggedUserId();
+        Page<UserSongResponse> musicas = userSongService.listarMusicas(userId, searchTerm, pageable);
         return ResponseEntity.ok(musicas);
     }
 
@@ -54,5 +59,12 @@ public class UserSongController {
         return userSongService.verificarMusicaSalva(trackId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @Operation(summary = "Obter apenas os IDs das músicas salvas no perfil")
+    @GetMapping("/ids")
+    public ResponseEntity<java.util.List<String>> obterIdsFavoritos() {
+        Long userId = userSongService.getLoggedUserId();
+        return ResponseEntity.ok(userSongService.getFavoriteTrackIds(userId));
     }
 }

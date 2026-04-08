@@ -2,7 +2,6 @@ package com.joaopaulo.musicas.services;
 
 import com.joaopaulo.musicas.dtos.request.MusicSaveRequest;
 import com.joaopaulo.musicas.entities.Playlist;
-import com.joaopaulo.musicas.enums.MusicSource;
 import com.joaopaulo.musicas.exceptions.PlaylistNotFoundException;
 import com.joaopaulo.musicas.exceptions.SpotifyApiException;
 import com.joaopaulo.musicas.exceptions.UnauthorizedException;
@@ -11,11 +10,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientResponseException;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,6 +34,7 @@ public class PlaylistService {
     private String cachedAppToken;
     private long tokenExpiration;
 
+    @SuppressWarnings("null")
     public Playlist create(Playlist playlist) {
         // Hardening: Garante que o usuário logado seja sempre o dono da nova playlist, 
         // independente do que vier no objeto original (Segurança por Definição).
@@ -48,6 +45,7 @@ public class PlaylistService {
         return playlistRepository.save(playlist);
     }
 
+    @SuppressWarnings("null")
     public Playlist update(String id, Playlist playlistDetails) {
         checkPlaylistOwnership(id);
         Playlist playlist = playlistRepository.findById(id)
@@ -69,19 +67,23 @@ public class PlaylistService {
         return playlistRepository.findByUserIdAndPublicoTrue(userId);
     }
 
+    @SuppressWarnings("null")
     public Optional<Playlist> findById(String id) {
         return playlistRepository.findById(id);
     }
 
+    @SuppressWarnings("null")
     public Playlist save(Playlist playlist) {
         return playlistRepository.save(playlist);
     }
 
+    @SuppressWarnings("null")
     public void delete(String id) {
         checkPlaylistOwnership(id);
         playlistRepository.deleteById(id);
     }
 
+    @SuppressWarnings("null")
     public Playlist addTrack(String playlistId, MusicSaveRequest request) {
         checkPlaylistOwnership(playlistId);
         Playlist playlist = playlistRepository.findById(playlistId)
@@ -99,6 +101,7 @@ public class PlaylistService {
         return playlistRepository.save(playlist);
     }
 
+    @SuppressWarnings("null")
     public Playlist addTracks(String playlistId, List<MusicSaveRequest> requests) {
         checkPlaylistOwnership(playlistId);
         Playlist playlist = playlistRepository.findById(playlistId)
@@ -121,6 +124,7 @@ public class PlaylistService {
         return playlistRepository.save(playlist);
     }
 
+    @SuppressWarnings("null")
     public Playlist removeTrack(String playlistId, String trackId) {
         checkPlaylistOwnership(playlistId);
         Playlist playlist = playlistRepository.findById(playlistId)
@@ -131,18 +135,19 @@ public class PlaylistService {
         return playlistRepository.save(playlist);
     }
 
+    @SuppressWarnings("null")
     @org.springframework.transaction.annotation.Transactional
     public Playlist importPlaylistData(com.joaopaulo.musicas.dtos.request.SpotifyImportDataRequest request) {
         Long userId = getLoggedUserId();
         
         List<com.joaopaulo.musicas.dtos.request.SpotifyImportDataRequest.SpotifyTrackData> tracks = request.getTracks();
-        log.info("[Import Diagnostic] Recebidas {} músicas do Frontend para a playlist {}", 
+        log.debug("[Import Diagnostic] Recebidas {} músicas do Frontend para a playlist {}", 
                 tracks != null ? tracks.size() : 0, 
                 request.getName());
         
         if (tracks != null && !tracks.isEmpty()) {
             var first = tracks.get(0);
-            log.info("[Import Diagnostic] Exemplo da primeira música: ID={}, Nome={}, Artista={}, URI={}", 
+            log.debug("[Import Diagnostic] Exemplo da primeira música: ID={}, Nome={}, Artista={}, URI={}", 
                     first.getId(), first.getName(), first.getArtist(), first.getUri());
         }
         
@@ -241,6 +246,7 @@ public class PlaylistService {
         }
     }
 
+    @SuppressWarnings("null")
     private String getAppAccessToken() {
         if (cachedAppToken != null && System.currentTimeMillis() < tokenExpiration) {
             return cachedAppToken;
@@ -278,6 +284,7 @@ public class PlaylistService {
         return details.getId();
     }
 
+    @SuppressWarnings("null")
     private void checkPlaylistOwnership(String playlistId) {
         Playlist playlist = playlistRepository.findById(playlistId)
                 .orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));

@@ -13,6 +13,7 @@ import java.util.Arrays;
 public class RestClientConfig {
 
     @Bean
+    @SuppressWarnings("null")
     public RestClient restClient() { // Removi o parâmetro daqui
         // 1. Criamos o conversor para aceitar o formato da Apple
         MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter();

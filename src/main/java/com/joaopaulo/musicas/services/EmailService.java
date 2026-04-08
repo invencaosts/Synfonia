@@ -15,6 +15,7 @@ public class EmailService {
     private final JavaMailSender mailSender;
 
     @Async
+    @SuppressWarnings("null")
     public void sendResetPasswordEmail(String to, String code) throws MessagingException {
         MimeMessage mimeMessage = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");

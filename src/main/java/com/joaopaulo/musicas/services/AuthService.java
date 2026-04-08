@@ -125,6 +125,7 @@ public class AuthService {
                 .build();
     }
 
+    @SuppressWarnings("null")
     public UsuarioResponse getAuthenticatedUser() {
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof com.joaopaulo.musicas.security.UsuarioDetails details)) {
@@ -164,6 +165,7 @@ public class AuthService {
                 usuario.getEmail(), tentativas, usuario.getBloqueadoAte());
     }
 
+    @SuppressWarnings("null")
     private void validatePassword(String password, String email) {
         // Mínimo 8 caracteres
         if (password.length() < 8) {

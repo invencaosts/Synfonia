@@ -22,20 +22,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.CsrfToken;
-import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
-import org.springframework.web.filter.OncePerRequestFilter;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -70,6 +60,10 @@ public class SecurityConfig {
                 .filter(o -> !o.isEmpty())
                 .collect(Collectors.toList());
         
+        if (!origins.contains("http://127.0.0.1:5173")) {
+            origins.add("http://127.0.0.1:5173");
+        }
+        
         config.setAllowedOriginPatterns(origins);
         
         config.setAllowedHeaders(List.of("*"));
@@ -102,9 +96,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/musicas/search").permitAll()
                 .requestMatchers("/api/v1/musicas/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/v1/spotify/callback").permitAll()
                 .requestMatchers("/api/v1/spotify/**").authenticated()
                 .requestMatchers("/api/v1/users/**", "/api/v1/usuarios/**").authenticated()
-                .requestMatchers("/api/v1/historico/**").authenticated()
+                .requestMatchers("/api/v1/historico", "/api/v1/historico/**").authenticated()
                 .requestMatchers("/api/v1/playlists/**").authenticated()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .anyRequest().authenticated()

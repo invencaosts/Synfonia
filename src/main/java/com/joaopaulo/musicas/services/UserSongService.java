@@ -1,27 +1,20 @@
 package com.joaopaulo.musicas.services;
 
-import com.joaopaulo.musicas.dtos.response.MusicResponse;
 import com.joaopaulo.musicas.entities.UserSong;
-import com.joaopaulo.musicas.exceptions.IdorSecurityException;
 import com.joaopaulo.musicas.exceptions.UsuarioNaoEncontradoException;
 import com.joaopaulo.musicas.repositories.UserSongRepository;
 import com.joaopaulo.musicas.repositories.UsuarioRepository;
-import com.joaopaulo.musicas.security.UsuarioDetails;
 import com.joaopaulo.musicas.dtos.response.UserSongResponse;
 import com.joaopaulo.musicas.enums.MusicSource;
 import com.joaopaulo.musicas.mappers.MusicMapper;
-
-import com.joaopaulo.musicas.services.MusicService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -35,6 +28,7 @@ public class UserSongService {
     private final MusicService musicService;
     private final MusicMapper musicMapper;
 
+    @SuppressWarnings("null")
     public UserSong adicionarMusica(com.joaopaulo.musicas.dtos.request.MusicSaveRequest request) {
         Long userId = getLoggedUserId();
         String trackId = request.getTrackId();
@@ -49,7 +43,7 @@ public class UserSongService {
 
         Optional<UserSong> existente = userSongRepository.findByUserIdAndTrackId(userId, trackId);
         if (existente.isPresent()) {
-            log.info("Música {} já está na lista do usuário {}", trackId, userId);
+            log.debug("Música {} já está na lista do usuário {}", trackId, userId);
             return existente.get();
         }
 
@@ -60,6 +54,9 @@ public class UserSongService {
                 .userId(userId)
                 .trackId(trackId)
                 .source(request.getSource())
+                .trackName(request.getNome())
+                .artistName(request.getArtista())
+                .albumName(request.getAlbum())
                 .dataAdicao(LocalDateTime.now())
                 .build();
 
@@ -73,76 +70,78 @@ public class UserSongService {
 
     public Long removerMusicasPorFonte(MusicSource source) {
         Long userId = getLoggedUserId();
-        
-        // 1. Deleta pelo campo source explicitamente (funciona para novas importações)
-        Long count = userSongRepository.deleteByUserIdAndSource(userId, source);
-        
-        // 2. Fallback Heurístico: Remove registros antigos que não tinham o campo source preenchido
-        // mas que são claramente do Spotify (ID alfanumérico longo)
-        if (source == MusicSource.SPOTIFY) {
-            List<UserSong> allSongs = userSongRepository.findByUserId(userId);
-            List<UserSong> legacySpotifySongs = allSongs.stream()
-                    .filter(us -> us.getSource() == null && isSpotifyLikeId(us.getTrackId()))
-                    .toList();
-            
-            if (!legacySpotifySongs.isEmpty()) {
-                userSongRepository.deleteAll(legacySpotifySongs);
-                count += legacySpotifySongs.size();
-                log.info("Removidas {} músicas legadas do Spotify (id heurístico) para o usuário {}", legacySpotifySongs.size(), userId);
-            }
-        }
-
-        log.info("Sincronização removida com sucesso: total de {} músicas da fonte {} apagadas para o usuário {}", count, source, userId);
-        return count;
+        return userSongRepository.deleteByUserIdAndSource(userId, source);
     }
 
-    private boolean isSpotifyLikeId(String trackId) {
-        if (trackId == null) return false;
-        // IDs do Spotify são alfanuméricos (letras e números) de ~22 caracteres.
-        // IDs da Apple/iTunes são puramente numéricos.
-        return trackId.length() > 10 && trackId.matches("^[a-zA-Z0-9]+$") && !trackId.matches("^\\d+$");
+    public Page<UserSongResponse> listarMusicas(Long userId, Pageable pageable) {
+        return listarMusicas(userId, null, pageable);
     }
 
-    public List<UserSongResponse> listarMusicas() {
-        Long userId = getLoggedUserId();
-
-        if (!usuarioRepository.existsById(userId)) {
+    public Page<UserSongResponse> listarMusicas(Long userId, String searchTerm, Pageable pageable) {
+        if (!usuarioRepository.existsById(java.util.Objects.requireNonNull(userId))) {
             throw new UsuarioNaoEncontradoException("Usuário não encontrado");
         }
         
-        return userSongRepository.findByUserId(userId).stream()
-                .map(us -> {
-                    com.joaopaulo.musicas.dtos.response.MusicResponse musicResponse;
-                    try {
-                        var musicEntity = musicService.findById(us.getTrackId());
-                        musicResponse = musicMapper.toResponse(musicEntity);
-                    } catch (com.joaopaulo.musicas.exceptions.MusicNotFoundException e) {
-                        log.warn("Música {} não encontrada no catálogo para exibição na biblioteca.", us.getTrackId());
-                        musicResponse = com.joaopaulo.musicas.dtos.response.MusicResponse.builder()
-                                .id(us.getTrackId())
-                                .nome("Música indisponível")
-                                .artista("Artista desconhecido")
-                                .album("Álbum desconhecido")
-                                .capaUrl("")
-                                .anoLancamento(null)
-                                .previewUrl("")
-                                .source(null)
-                                .build();
-                    }
-                    
-                    return new UserSongResponse(
-                            us.getId(),
-                            us.getUserId(),
-                            musicResponse,
-                            us.getDataAdicao()
-                    );
-                })
-                .toList();
+        Page<UserSong> page;
+        if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+            page = userSongRepository.findByUserIdAndSearchTerm(userId, searchTerm.trim(), pageable);
+        } else {
+            page = userSongRepository.findByUserId(userId, pageable);
+        }
+
+        return page.map(us -> {
+            com.joaopaulo.musicas.dtos.response.MusicResponse musicResponse;
+            try {
+                var musicEntity = musicService.findById(us.getTrackId());
+                musicResponse = musicMapper.toResponse(musicEntity);
+
+                // Auto-reparo de metadados para busca/ordenação caso estejam faltando (dados legados)
+                if (us.getTrackName() == null || us.getArtistName() == null) {
+                    us.setTrackName(musicEntity.getNome());
+                    us.setArtistName(musicEntity.getArtista());
+                    us.setAlbumName(musicEntity.getAlbum());
+                    userSongRepository.save(us);
+                    log.info("Metadados reparados para UserSong ID: {} (Música: {})", us.getId(), us.getTrackName());
+                }
+
+            } catch (com.joaopaulo.musicas.exceptions.MusicNotFoundException e) {
+                log.warn("Música {} não encontrada no catálogo para exibição na biblioteca.", us.getTrackId());
+                musicResponse = com.joaopaulo.musicas.dtos.response.MusicResponse.builder()
+                        .id(us.getTrackId())
+                        .nome("Música indisponível")
+                        .artista("Artista desconhecido")
+                        .album("Álbum desconhecido")
+                        .capaUrl("")
+                        .anoLancamento(null)
+                        .previewUrl("")
+                        .source(us.getSource())
+                        .build();
+            }
+
+            return new com.joaopaulo.musicas.dtos.response.UserSongResponse(
+                    us.getId(),
+                    us.getUserId(),
+                    musicResponse,
+                    us.getDataAdicao()
+            );
+        });
     }
 
     public Optional<UserSong> verificarMusicaSalva(String trackId) {
         Long userId = getLoggedUserId();
         return userSongRepository.findByUserIdAndTrackId(userId, trackId);
+    }
+
+    public java.util.List<String> getFavoriteTrackIds(Long userId) {
+        if (userId == null) {
+            return java.util.Collections.emptyList();
+        }
+        if (!usuarioRepository.existsById(userId)) {
+            throw new UsuarioNaoEncontradoException("Usuário não encontrado");
+        }
+        return userSongRepository.findTrackIdsByUserId(userId).stream()
+                .map(UserSong::getTrackId)
+                .toList();
     }
 
     public Long getLoggedUserId() {

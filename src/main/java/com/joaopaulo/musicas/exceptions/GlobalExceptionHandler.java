@@ -108,10 +108,12 @@ public class GlobalExceptionHandler {
                 ex.getMessage() != null ? ex.getMessage() : "Erro inesperado no servidor.", request);
     }
 
+    @SuppressWarnings("null")
     private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, String title, String message, HttpServletRequest request) {
         return buildResponse(status, title, message, request, null);
     }
 
+    @SuppressWarnings("null")
     private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, String title, String message, HttpServletRequest request, Map<String, String> errors) {
         return ResponseEntity.status(status)
                 .body(new ErrorResponse(

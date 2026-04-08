@@ -11,6 +11,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -37,10 +39,33 @@ public class SpotifyController {
     @Value("${spotify.redirect.uri}")
     private String redirectUri;
 
-    @Operation(summary = "Troca o código de autorização por um token de acesso")
+    @Operation(summary = "Callback do Spotify para troca de código por token")
     @GetMapping("/callback")
-    public ResponseEntity<SpotifyTokenResponse> callback(@RequestParam("code") String code) {
-        log.info("Recebido código de autorização do Spotify, iniciando troca por token.");
+    public ResponseEntity<SpotifyTokenResponse> callback(
+            @RequestParam("code") String code,
+            @RequestParam(value = "state", required = false) String state) {
+        
+        log.info("Recebido código de autorização do Spotify, validando sessão e state.");
+
+        // 1. Validação do Parâmetro State
+        if (state == null || state.isEmpty()) {
+            log.error("[Spotify Auth] Parâmetro 'state' ausente no redirecionamento.");
+            throw new SpotifyApiException("A validação de segurança falhou: parâmetro 'state' ausente.");
+        }
+
+        if (!"synfonia-auth".equals(state)) {
+            log.error("[Spotify Auth] State inválido recebido: {}", state);
+            throw new SpotifyApiException("A validação de segurança falhou: state inválido.");
+        }
+
+        // 2. Validação da Sessão (O filtro JWT já deve ter populado o SecurityContext via Cookie)
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken) {
+            log.error("[Spotify Auth] Tentativa de callback sem sessão ativa. Usuário deslogado ou cookie expirou.");
+            throw new SpotifyApiException("Você precisa estar logado para conectar sua conta Spotify.");
+        }
+
+        log.info("[Spotify Auth] Sessão ({}) e State validados. Iniciando troca por token.", authentication.getName());
 
         String authHeader = "Basic " + Base64.getEncoder().encodeToString((clientId + ":" + clientSecret).getBytes());
 
@@ -55,12 +80,12 @@ public class SpotifyController {
             SpotifyTokenResponse response = restClient.post()
                     .uri("https://accounts.spotify.com/api/token")
                     .header("Authorization", authHeader)
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .contentType(java.util.Objects.requireNonNull(MediaType.APPLICATION_FORM_URLENCODED))
                     .body(formData)
                     .retrieve()
                     .body(SpotifyTokenResponse.class);
 
-            if (response != null && response.access_token() != null) {
+            if (response != null && response.accessToken() != null) {
                 log.info("[Spotify Auth] Sucesso! Token recebido.");
             }
             return ResponseEntity.ok(response);

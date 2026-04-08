@@ -12,14 +12,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.ResourceAccessException;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -59,6 +54,7 @@ public class MusicService {
         }
     }
 
+    @SuppressWarnings("null")
     public MusicEntity findById(String id) {
         return musicRepository.findById(id)
                 .orElseGet(() -> {
@@ -68,6 +64,7 @@ public class MusicService {
     }
 
     // Novo método para quando REALMENTE precisamos tentar um fallback de preview
+    @SuppressWarnings("null")
     public MusicEntity findByIdWithPreviewFallback(String id) {
         return musicRepository.findById(id)
                 .map(entity -> {
@@ -92,6 +89,7 @@ public class MusicService {
                 .orElseGet(() -> fetchByTrackIdFromApple(id));
     }
 
+    @SuppressWarnings("null")
     private MusicEntity fetchByTrackIdFromApple(String trackId) {
 
         try {
@@ -107,7 +105,7 @@ public class MusicService {
 
             if (wrapper != null && wrapper.getResults() != null && !wrapper.getResults().isEmpty()) {
                 MusicEntity entity = musicMapper.toEntity(wrapper.getResults().get(0));
-                log.info("Música {} recuperada com sucesso da Apple. Salvando no catálogo.", trackId);
+                log.debug("Música {} recuperada com sucesso da Apple. Salvando no catálogo.", trackId);
                 return musicRepository.save(entity);
             }
         } catch (Exception e) {
@@ -116,11 +114,13 @@ public class MusicService {
         throw new MusicNotFoundException("Música não encontrada no catálogo local nem no provedor externo.");
     }
 
+    @SuppressWarnings("null")
     public MusicEntity saveFromApple(String trackId) {
         return musicRepository.findById(trackId)
                 .orElseGet(() -> fetchByTrackIdFromApple(trackId));
     }
 
+    @SuppressWarnings("null")
     public MusicEntity saveCustomMusic(com.joaopaulo.musicas.dtos.request.MusicSaveRequest request) {
         return musicRepository.findById(request.getTrackId())
                 .orElseGet(() -> {
@@ -135,7 +135,7 @@ public class MusicService {
                             .anoLancamento(request.getAnoLancamento())
                             .source(request.getSource() != null ? request.getSource() : com.joaopaulo.musicas.enums.MusicSource.SPOTIFY)
                             .build();
-                    log.info("Música personalizada (ex: Spotify) {} salva no catálogo.", request.getTrackId());
+                    log.debug("Música personalizada (ex: Spotify) {} salva no catálogo.", request.getTrackId());
                     return musicRepository.save(entity);
                 });
     }

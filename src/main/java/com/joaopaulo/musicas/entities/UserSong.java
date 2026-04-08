@@ -29,6 +29,15 @@ public class UserSong {
     private MusicSource source;
 
     @Indexed
+    private String trackName;
+
+    @Indexed
+    private String artistName;
+
+    @Indexed
+    private String albumName;
+
+    @Indexed
     private LocalDateTime dataAdicao;
 
 }

@@ -28,10 +28,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
+            @org.springframework.lang.NonNull HttpServletRequest request,
+            @org.springframework.lang.NonNull HttpServletResponse response,
+            @org.springframework.lang.NonNull FilterChain filterChain
     ) throws ServletException, IOException {
+
+        log.debug("[AuthFilter] Processando requisição: {} {}", request.getMethod(), request.getRequestURI());
 
         // Ignorar requisições OPTIONS (Preflight de CORS)
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
@@ -53,8 +55,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // 2. Se não houver token válido no Header, tentar extrair do Cookie (Web Session)
         if (token == null && request.getCookies() != null) {
             token = Arrays.stream(request.getCookies())
-                    .filter(cookie -> "accessToken".equals(cookie.getName()))
+                    .filter(cookie -> "synfonia_access".equals(cookie.getName()))
                     .map(Cookie::getValue)
+                    .filter(jwtUtil::isTokenValidGracefully)
                     .findFirst()
                     .orElse(null);
         }

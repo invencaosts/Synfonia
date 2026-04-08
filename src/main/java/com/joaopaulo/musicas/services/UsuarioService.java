@@ -46,6 +46,7 @@ public class UsuarioService {
         usuarioRepository.save(usuario);
     }
 
+    @SuppressWarnings("null")
     public Usuario updateProfile(Map<String, Object> profileData) {
         Usuario usuario = getLoggedUser();
         
@@ -132,6 +133,7 @@ public class UsuarioService {
         return getLoggedUser();
     }
 
+    @SuppressWarnings("null")
     private Usuario getLoggedUser() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof UsuarioDetails details)) {

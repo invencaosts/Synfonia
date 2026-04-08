@@ -23,8 +23,11 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     private final RateLimitingService rateLimitingService;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(
+            @org.springframework.lang.NonNull HttpServletRequest request,
+            @org.springframework.lang.NonNull HttpServletResponse response,
+            @org.springframework.lang.NonNull FilterChain filterChain
+    ) throws ServletException, IOException {
 
         // Ignorar requisições OPTIONS (Preflight de CORS) para não consumir rate limit
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {

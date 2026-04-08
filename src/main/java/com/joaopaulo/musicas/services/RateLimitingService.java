@@ -2,7 +2,6 @@ package com.joaopaulo.musicas.services;
 
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
-import io.github.bucket4j.Refill;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -32,17 +31,22 @@ public class RateLimitingService {
 
     private Bucket createLoginBucket(String key) {
         // Limite: 5 tokens, refil de 5 tokens a cada 1 minuto
-        Bandwidth limit = Bandwidth.classic(5, Refill.intervally(5, Duration.ofMinutes(1)));
         return Bucket.builder()
-                .addLimit(limit)
+                .addLimit(Bandwidth.builder()
+                        .capacity(5)
+                        .refillIntervally(5, Duration.ofMinutes(1))
+                        .build())
                 .build();
     }
 
     private Bucket createApiBucket(String key) {
-        // Limite: 60 tokens, refil de 60 tokens a cada 1 minuto
-        Bandwidth limit = Bandwidth.classic(60, Refill.intervally(60, Duration.ofMinutes(1)));
+        // Limite expandido: 2000 tokens de capacidade para bursts (importações)
+        // Refill Greedy: Regenera 2000 tokens por minuto continuamente (não espera o minuto virar)
         return Bucket.builder()
-                .addLimit(limit)
+                .addLimit(Bandwidth.builder()
+                        .capacity(2000)
+                        .refillGreedy(2000, Duration.ofMinutes(1))
+                        .build())
                 .build();
     }
 }

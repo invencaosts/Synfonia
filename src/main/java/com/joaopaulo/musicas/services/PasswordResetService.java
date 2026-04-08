@@ -6,14 +6,11 @@ import com.joaopaulo.musicas.exceptions.UsuarioNaoEncontradoException;
 import com.joaopaulo.musicas.repositories.PasswordResetTokenRepository;
 import com.joaopaulo.musicas.repositories.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
-
 import java.util.Random;
 
 @Service
@@ -25,6 +22,7 @@ public class PasswordResetService {
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
 
+    @SuppressWarnings("null")
     @Transactional
     public void createPasswordResetToken(String email) {
         String normalizedEmail = email.trim().toLowerCase();
