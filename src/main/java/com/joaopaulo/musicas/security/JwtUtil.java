@@ -26,14 +26,18 @@ public class JwtUtil {
     @Value("${jwt.refreshExpiration.ms}")
     private long refreshTokenExpiration;
 
-    private SecretKey getSigningKey() {
-        if (secret == null || secret.length() < 32) {
-            log.error("[JWT] O segredo (JWT_SECRET) é nulo ou muito curto ({} caracteres)! Usando emergencial fixo.", 
-                secret == null ? 0 : secret.length());
-            return Keys.hmacShaKeyFor("emergencia-v8u785yt8743589734y58934y58934y58934".getBytes(StandardCharsets.UTF_8));
+    @jakarta.annotation.PostConstruct
+    public void validateConfig() {
+        if (secret == null || secret.trim().isEmpty()) {
+            throw new IllegalStateException("[JWT] ERRO CRÍTICO: A variável JWT_SECRET não foi configurada no ambiente!");
         }
-        // Log técnico apenas uma vez para conferência (sem mostrar o secret por segurança)
-        log.debug("[JWT] Usando chave de assinatura baseada em segredo de {} caracteres.", secret.length());
+        if (secret.length() < 32) {
+            throw new IllegalStateException("[JWT] ERRO CRÍTICO: O segredo configurado em JWT_SECRET é muito curto. Deve ter pelo menos 32 caracteres para garantir a segurança da assinatura HS256.");
+        }
+        log.info("[JWT] Configuração de segurança validada com sucesso.");
+    }
+
+    private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 

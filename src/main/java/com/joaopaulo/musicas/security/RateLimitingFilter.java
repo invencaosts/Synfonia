@@ -70,23 +70,10 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     private String getClientIP(HttpServletRequest request) {
-        String xfHeader = request.getHeader("X-Forwarded-For");
-        
-        if (xfHeader == null || xfHeader.isEmpty()) {
-            return request.getRemoteAddr();
-        }
-
-        // Para evitar Spoofing, pegamos apenas a primeira parte do cabeçalho
-        // Em um ambiente de produção real (Azure/AWS), o proxy deve estar configurado
-        // para sanitizar ou sobrescrever este header.
-        String clientIp = xfHeader.split(",")[0].trim();
-        
-        // Verificação básica: se o IP extraído for inválido ou muito longo, 
-        // falhamos para o RemoteAddr por segurança.
-        if (clientIp.length() > 45) { // IPv6 max length
-            return request.getRemoteAddr();
-        }
-        
-        return clientIp;
+        // Para evitar Spoofing, usamos o RemoteAddr real da conexão.
+        // Se a aplicação estiver atrás de um proxy reverso confiável (Nginx/Cloudflare),
+        // o Spring deve ser configurado via 'server.forward-headers-strategy=native'
+        // para que o getRemoteAddr() já retorne o IP correto do cliente de forma segura.
+        return request.getRemoteAddr();
     }
 }

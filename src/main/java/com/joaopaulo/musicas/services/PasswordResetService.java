@@ -10,13 +10,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Random;
 
 @Service
 @RequiredArgsConstructor
 public class PasswordResetService {
 
+    private static final SecureRandom secureRandom = new SecureRandom();
     private final PasswordResetTokenRepository tokenRepository;
     private final UsuarioRepository usuarioRepository;
     private final EmailService emailService;
@@ -34,7 +35,7 @@ public class PasswordResetService {
         tokenRepository.flush(); 
 
         // Gera código de 6 dígitos
-        String code = String.format("%06d", new Random().nextInt(1000000));
+        String code = String.format("%06d", secureRandom.nextInt(1000000));
         
         PasswordResetToken resetToken = PasswordResetToken.builder()
                 .token(code)
