@@ -69,7 +69,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(SpotifyApiException.class)
     public ResponseEntity<ErrorResponse> handleSpotifyApi(SpotifyApiException ex, HttpServletRequest request) {
         log.error("Erro na API do Spotify: {}", ex.getMessage());
-        return buildResponse(HttpStatus.BAD_GATEWAY, "Erro no Spotify", ex.getMessage(), request);
+        return buildResponse(HttpStatus.BAD_REQUEST, "Erro no Spotify", ex.getMessage(), request);
     }
 
     @ExceptionHandler(UnauthorizedException.class)
