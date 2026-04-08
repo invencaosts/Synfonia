@@ -24,8 +24,9 @@ public interface UsuarioMapper {
                 .username(usuario.getUsername())
                 .displayName(usuario.getDisplayName())
                 .personalName(usuario.getPersonalName())
-                .showPersonalName(usuario.isShowPersonalName())
-                .showSpotifyActivity(usuario.isShowSpotifyActivity())
+                .showPersonalName(usuario.getShowPersonalName() != null ? usuario.getShowPersonalName() : true)
+                .showSpotifyActivity(usuario.getShowSpotifyActivity() != null ? usuario.getShowSpotifyActivity() : true)
+                .dataDesativacao(usuario.getDataDesativacao())
                 .papel(usuario.getPapel())
                 .ativo(usuario.isAtivo())
                 .dataCriacao(usuario.getDataCriacao())
@@ -36,6 +37,7 @@ public interface UsuarioMapper {
                 .favoriteTrackCapaUrl(usuario.getFavoriteTrackCapaUrl())
                 .favoriteTrackPreviewUrl(usuario.getFavoriteTrackPreviewUrl())
                 .fotoPerfil(usuario.getFotoPerfil())
+                .usernameChanged(usuario.isUsernameChanged())
                 .build();
 
     }

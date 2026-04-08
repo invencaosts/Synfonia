@@ -26,8 +26,18 @@ public class JwtUtil {
     @Value("${jwt.refreshExpiration.ms}")
     private long refreshTokenExpiration;
 
+    @jakarta.annotation.PostConstruct
+    public void validateConfig() {
+        if (secret == null || secret.trim().isEmpty()) {
+            throw new IllegalStateException("[JWT] ERRO CRÍTICO: A variável JWT_SECRET não foi configurada no ambiente!");
+        }
+        if (secret.length() < 32) {
+            throw new IllegalStateException("[JWT] ERRO CRÍTICO: O segredo configurado em JWT_SECRET é muito curto. Deve ter pelo menos 32 caracteres para garantir a segurança da assinatura HS256.");
+        }
+        log.info("[JWT] Configuração de segurança validada com sucesso.");
+    }
+
     private SecretKey getSigningKey() {
-        // Gerar chave a partir do segredo (padrão HS512)
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -49,11 +59,16 @@ public class JwtUtil {
         claims.put("email", email);
         claims.put("role", role);
 
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + expiration);
+
+        log.info("[JWT] Gerando token para {}. Criado em: {}, Expira em: {}", email, now, expiryDate);
+
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(email)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -68,12 +83,29 @@ public class JwtUtil {
 
     public boolean isTokenValid(String token, String email) {
         try {
-            final Claims claims = extractAllClaims(token);
-            final String emailFromToken = claims.getSubject();
-            final Date expiration = claims.getExpiration();
-            return emailFromToken.equals(email) && !expiration.before(new Date());
-        } catch (JwtException | IllegalArgumentException e) {
-            log.warn("Token inválido: {}", e.getMessage());
+            final String username = extractEmail(token);
+            boolean isValid = username.equals(email) && !isTokenExpired(token);
+            if (!isValid) {
+                log.warn("[JWT] Token inválido para o usuário {}. Expirado: {}", email, isTokenExpired(token));
+            }
+            return isValid;
+        } catch (Exception e) {
+            log.error("[JWT] Erro ao validar token para {}: {}", email, e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean isTokenValidGracefully(String token) {
+        if (token == null || token.isEmpty()) return false;
+        try {
+            Claims claims = extractAllClaims(token);
+            return !claims.getExpiration().before(new Date());
+        } catch (ExpiredJwtException e) {
+            return false;
+        } catch (io.jsonwebtoken.JwtException e) {
+            log.error("[JWT] Erro de SEGURANÇA ou ASSINATURA: {}", e.getMessage());
+            return false;
+        } catch (Exception e) {
             return false;
         }
     }
@@ -97,4 +129,4 @@ public class JwtUtil {
     public long getAccessTokenExpiration() {
         return accessTokenExpiration;
     }
-}
+}

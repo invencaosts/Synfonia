@@ -18,7 +18,7 @@ public class UsuarioResponse {
     private String personalName;
     private boolean showPersonalName;
     private boolean showSpotifyActivity;
-
+    private java.time.LocalDateTime dataDesativacao;
     private Usuario.Papel papel;
     private boolean ativo;
     private java.time.LocalDateTime dataCriacao;
@@ -31,5 +31,5 @@ public class UsuarioResponse {
     private String favoriteTrackPreviewUrl;
     
     private String fotoPerfil;
-
+    private boolean usernameChanged;
 }

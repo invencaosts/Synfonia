@@ -45,6 +45,10 @@ public class AuthService {
     public UsuarioResponse register(UsuarioRequest request) {
         log.info("Registro de novo usuário: {}", request.getEmail());
 
+        if (!request.getEmail().equals(request.getConfirmarEmail())) {
+            throw new SenhaInvalidaException("E-mail e confirmação de e-mail não conferem");
+        }
+
         if (!request.getSenha().equals(request.getConfirmarSenha())) {
             throw new SenhaInvalidaException("Senha e confirmação de senha não conferem");
         }
@@ -56,12 +60,13 @@ public class AuthService {
         }
 
         if (usuarioRepository.existsByUsername(request.getUsername())) {
-            throw new EmailJaCadastradoException("Este usuário (@" + request.getUsername() + ") já está em uso");
+            throw new EmailJaCadastradoException("Este nome de usuário já está em uso");
         }
-
 
         Usuario usuario = usuarioMapper.toEntity(request);
         usuario.setSenha(passwordEncoder.encode(request.getSenha()));
+        usuario.setUsername(request.getUsername());
+        usuario.setDisplayName(request.getDisplayName()); 
         usuario.setAtivo(true);
         usuario.setPapel(Usuario.Papel.USER);
 
@@ -76,8 +81,19 @@ public class AuthService {
     public LoginResponse login(LoginRequest request) {
         log.info("Tentativa de login: {}", request.getEmail());
 
-        Usuario usuario = usuarioRepository.findByEmailAndAtivoTrue(request.getEmail())
+        Usuario usuario = usuarioRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new UsuarioNaoEncontradoException("Usuário não encontrado ou inativo"));
+
+        if (!usuario.isAtivo()) {
+            if (usuario.getDataDesativacao() != null && usuario.getDataDesativacao().plusDays(7).isAfter(LocalDateTime.now())) {
+                usuario.setAtivo(true);
+                usuario.setDataDesativacao(null);
+                usuarioRepository.save(usuario);
+                log.info("Conta reativada via login: {}", request.getEmail());
+            } else {
+                throw new UsuarioNaoEncontradoException("Usuário não encontrado ou conta deletada permanentemente");
+            }
+        }
 
         // Verificar bloqueio
         if (usuario.getBloqueadoAte() != null && usuario.getBloqueadoAte().isAfter(LocalDateTime.now())) {
@@ -105,9 +121,21 @@ public class AuthService {
         return LoginResponse.builder()
                 .token(accessToken)
                 .refreshToken(refreshToken)
-                .expiraEm(System.currentTimeMillis() + jwtUtil.getAccessTokenExpiration())
                 .usuario(usuarioMapper.toResponse(usuario))
                 .build();
+    }
+
+    @SuppressWarnings("null")
+    public UsuarioResponse getAuthenticatedUser() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof com.joaopaulo.musicas.security.UsuarioDetails details)) {
+            throw new com.joaopaulo.musicas.exceptions.UnauthorizedException("Usuário não está autenticado");
+        }
+        
+        Usuario usuario = usuarioRepository.findById(details.getId())
+                .orElseThrow(() -> new UsuarioNaoEncontradoException("Usuário não encontrado"));
+        
+        return usuarioMapper.toResponse(usuario);
     }
 
     private void incrementarTentativasEBloquear(Usuario usuario) {
@@ -137,6 +165,7 @@ public class AuthService {
                 usuario.getEmail(), tentativas, usuario.getBloqueadoAte());
     }
 
+    @SuppressWarnings("null")
     private void validatePassword(String password, String email) {
         // Mínimo 8 caracteres
         if (password.length() < 8) {

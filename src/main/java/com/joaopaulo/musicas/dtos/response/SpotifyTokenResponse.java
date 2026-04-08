@@ -1,9 +1,11 @@
 package com.joaopaulo.musicas.dtos.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public record SpotifyTokenResponse(
-    String access_token,
-    String token_type,
-    Integer expires_in,
-    String refresh_token,
-    String scope
+    @JsonProperty("access_token") String accessToken,
+    @JsonProperty("token_type") String tokenType,
+    @JsonProperty("expires_in") Integer expiresIn,
+    @JsonProperty("refresh_token") String refreshToken,
+    @JsonProperty("scope") String scope
 ) {}

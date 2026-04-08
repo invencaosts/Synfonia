@@ -13,10 +13,18 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UsuarioRequest {
+
+    @NotBlank
+    @Size(min = 3, max = 50)
+    private String username;
     
     @Email
     @NotBlank
     private String email;
+    
+    @Email
+    @NotBlank
+    private String confirmarEmail;
     
     @NotBlank
     @Size(min = 8, message = "Senha deve ter pelo menos 8 caracteres")
@@ -27,14 +35,10 @@ public class UsuarioRequest {
     private String confirmarSenha;
     
     @NotBlank
-    @Size(max = 50)
-    private String username;
-
-    @NotBlank
-    @Size(max = 100)
+    @Size(min = 3, max = 50, message = "O Nome de Exibição deve ter entre 3 e 50 caracteres")
     private String displayName;
-
-    @Size(max = 100)
+    
+    // Opcionais para atualização posterior
     private String personalName;
-
+    private Boolean showPersonalName;
 }

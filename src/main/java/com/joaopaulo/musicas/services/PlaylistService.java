@@ -14,7 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
-import com.fasterxml.jackson.databind.JsonNode;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.Objects;
@@ -38,12 +38,21 @@ public class PlaylistService {
     private String cachedAppToken;
     private long tokenExpiration;
 
+    @SuppressWarnings("null")
     public Playlist create(Playlist playlist) {
-        return playlistRepository.save(Objects.requireNonNull(playlist));
+        // Hardening: Garante que o usuário logado seja sempre o dono da nova playlist, 
+        // independente do que vier no objeto original (Segurança por Definição).
+        playlist.setUserId(getLoggedUserId());
+        if (playlist.getTrackIds() == null) {
+            playlist.setTrackIds(new java.util.ArrayList<>());
+        }
+        return playlistRepository.save(playlist);
     }
 
+    @SuppressWarnings("null")
     public Playlist update(String id, Playlist playlistDetails) {
-        Playlist playlist = playlistRepository.findById(Objects.requireNonNull(id))
+        checkPlaylistOwnership(id);
+        Playlist playlist = playlistRepository.findById(id)
                 .orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
 
         if (playlistDetails.getNome() != null) playlist.setNome(playlistDetails.getNome());
@@ -62,20 +71,26 @@ public class PlaylistService {
         return playlistRepository.findByUserIdAndPublicoTrue(userId);
     }
 
+    @SuppressWarnings("null")
     public Optional<Playlist> findById(String id) {
         return playlistRepository.findById(Objects.requireNonNull(id));
     }
 
+    @SuppressWarnings("null")
     public Playlist save(Playlist playlist) {
         return playlistRepository.save(Objects.requireNonNull(playlist));
     }
 
+    @SuppressWarnings("null")
     public void delete(String id) {
-        playlistRepository.deleteById(Objects.requireNonNull(id));
+        checkPlaylistOwnership(id);
+        playlistRepository.deleteById(id);
     }
 
+    @SuppressWarnings("null")
     public Playlist addTrack(String playlistId, MusicSaveRequest request) {
-        Playlist playlist = playlistRepository.findById(Objects.requireNonNull(playlistId))
+        checkPlaylistOwnership(playlistId);
+        Playlist playlist = playlistRepository.findById(playlistId)
                 .orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
         
         String trackId = Objects.requireNonNull(request.getTrackId());
@@ -89,8 +104,10 @@ public class PlaylistService {
         return playlistRepository.save(Objects.requireNonNull(playlist));
     }
 
+    @SuppressWarnings("null")
     public Playlist addTracks(String playlistId, List<MusicSaveRequest> requests) {
-        Playlist playlist = playlistRepository.findById(Objects.requireNonNull(playlistId))
+        checkPlaylistOwnership(playlistId);
+        Playlist playlist = playlistRepository.findById(playlistId)
                 .orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
         
         if (playlist.getTrackIds() == null) {
@@ -110,8 +127,10 @@ public class PlaylistService {
         return playlistRepository.save(Objects.requireNonNull(playlist));
     }
 
+    @SuppressWarnings("null")
     public Playlist removeTrack(String playlistId, String trackId) {
-        Playlist playlist = playlistRepository.findById(Objects.requireNonNull(playlistId))
+        checkPlaylistOwnership(playlistId);
+        Playlist playlist = playlistRepository.findById(playlistId)
                 .orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
 
         playlist.getTrackIds().remove(Objects.requireNonNull(trackId));
@@ -119,37 +138,21 @@ public class PlaylistService {
         return playlistRepository.save(Objects.requireNonNull(playlist));
     }
 
-    public Long getLoggedUserId() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getPrincipal() instanceof UsuarioDetails details)) {
-            throw new UnauthorizedException("Usuário não está autenticado");
-        }
-        return details.getId();
-    }
-
-    public Playlist importSpotifyTracks(String playlistId, String spotifyPlaylistId) {
-        String token = getAppAccessToken();
-        List<com.joaopaulo.musicas.dtos.request.SpotifyImportDataRequest.SpotifyTrackData> tracks = fetchSpotifyTracks(spotifyPlaylistId, token);
-        
-        List<MusicSaveRequest> musicRequests = tracks.stream()
-                .map(t -> MusicSaveRequest.builder()
-                        .trackId(t.getId())
-                        .nome(t.getName())
-                        .artista(t.getArtist())
-                        .album(t.getAlbum())
-                        .capaUrl(t.getCapaUrl())
-                        .uri(t.getUri())
-                        .source(com.joaopaulo.musicas.enums.MusicSource.SPOTIFY)
-                        .build())
-                .toList();
-        
-        return addTracks(playlistId, musicRequests);
-    }
-
+    @SuppressWarnings("null")
     @org.springframework.transaction.annotation.Transactional
-    public Playlist importPlaylistData(SpotifyImportDataRequest request) {
+    public Playlist importPlaylistData(com.joaopaulo.musicas.dtos.request.SpotifyImportDataRequest request) {
         Long userId = getLoggedUserId();
-        List<com.joaopaulo.musicas.dtos.request.SpotifyImportDataRequest.SpotifyTrackData> tracks;
+        
+        List<com.joaopaulo.musicas.dtos.request.SpotifyImportDataRequest.SpotifyTrackData> tracks = request.getTracks();
+        log.debug("[Import Diagnostic] Recebidas {} músicas do Frontend para a playlist {}", 
+                tracks != null ? tracks.size() : 0, 
+                request.getName());
+        
+        if (tracks != null && !tracks.isEmpty()) {
+            var first = tracks.get(0);
+            log.debug("[Import Diagnostic] Exemplo da primeira música: ID={}, Nome={}, Artista={}, URI={}", 
+                    first.getId(), first.getName(), first.getArtist(), first.getUri());
+        }
         
         if (request.getTracks() != null && !request.getTracks().isEmpty()) {
             tracks = request.getTracks();
@@ -240,6 +243,7 @@ public class PlaylistService {
         }
     }
 
+    @SuppressWarnings("null")
     private String getAppAccessToken() {
         if (cachedAppToken != null && System.currentTimeMillis() < tokenExpiration) {
             return cachedAppToken;
@@ -263,8 +267,30 @@ public class PlaylistService {
                 return cachedAppToken;
             }
         } catch (Exception e) {
-            log.error("Erro ao obter App Access Token: {}", e.getMessage());
+            log.error("Falha ao obter token do Spotify via Client Credentials: {}", e.getMessage());
+        }
+        throw new SpotifyApiException("Não foi possível obter token do Spotify");
+    }
+
+
+    public Long getLoggedUserId() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof com.joaopaulo.musicas.security.UsuarioDetails details)) {
+            throw new UnauthorizedException("Usuário não está autenticado");
         }
         return null;
+    }
+
+    @SuppressWarnings("null")
+    private void checkPlaylistOwnership(String playlistId) {
+        Playlist playlist = playlistRepository.findById(playlistId)
+                .orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
+        
+        Long loggedUserId = getLoggedUserId();
+        if (!playlist.getUserId().equals(loggedUserId)) {
+            log.warn("Tentativa de acesso não autorizado: Usuário {} tentou modificar a playlist {} do usuário {}", 
+                    loggedUserId, playlistId, playlist.getUserId());
+            throw new UnauthorizedException("Você não tem permissão para modificar esta playlist");
+        }
     }
 }

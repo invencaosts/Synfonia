@@ -25,7 +25,7 @@ services:
 
   # =========== MongoDB para cache e históricos ===========
   mongodb:
-    image: mongo:7-alpine
+    image: mongo:7.0
     container_name: musicas_mongodb
     environment:
       MONGO_INITDB_DATABASE: musicas

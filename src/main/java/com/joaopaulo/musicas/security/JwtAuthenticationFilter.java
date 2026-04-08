@@ -3,6 +3,7 @@ package com.joaopaulo.musicas.security;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -32,16 +33,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @org.springframework.lang.NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
+a        log.debug("[AuthFilter] Processando requisição: {} {}", request.getMethod(), request.getRequestURI());
 
-        String authHeader = request.getHeader("Authorization");
+        // Ignorar requisições OPTIONS (Preflight de CORS)
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String token = null;
 
+        // 1. Tentar extrair do Header (Prioridade para APIs/Mobile)
+        String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            token = authHeader.substring(7);
-        } else if (request.getCookies() != null) {
+            String headerToken = authHeader.substring(7);
+            if (jwtUtil.isTokenValidGracefully(headerToken)) {
+                token = headerToken;
+            }
+        }
+
+        // 2. Se não houver token válido no Header, tentar extrair do Cookie (Web Session)
+        if (token == null && request.getCookies() != null) {
             token = Arrays.stream(request.getCookies())
-                    .filter(c -> "accessToken".equals(c.getName()))
-                    .map(jakarta.servlet.http.Cookie::getValue)
+                    .filter(cookie -> "synfonia_access".equals(cookie.getName()))
+                    .map(Cookie::getValue)
+                    .filter(jwtUtil::isTokenValidGracefully)
                     .findFirst()
                     .orElse(null);
         }
@@ -66,23 +82,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-
-                    // Renovação Sliding Session: Gerar um novo token para cada requisição válida
-                    if (userDetails instanceof UsuarioDetails ud) {
-                        String newToken = jwtUtil.generateAccessToken(
-                                ud.getUsername(),
-                                ud.getId(),
-                                ud.getAuthorities().stream()
-                                        .findFirst()
-                                        .map(a -> a.getAuthority().replace("ROLE_", ""))
-                                        .orElse("USER")
-                        );
-                        response.setHeader("New-Token", newToken);
-                    }
                 }
             }
         } catch (JwtException | IllegalArgumentException e) {
             log.warn("Token JWT inválido ou malformado: {}", e.getMessage());
+            // Não bloqueamos aqui para permitir que rotas públicas funcionem mesmo com token inválido
+            // O SecurityConfig cuida da autorização final
         }
 
         filterChain.doFilter(request, response);
