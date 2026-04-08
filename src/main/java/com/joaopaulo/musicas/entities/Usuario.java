@@ -39,7 +39,7 @@ public class Usuario {
 
     // Nome Pessoal (Subtítulo) - Apenas letras e espaços
     @Column(name = "nome_completo", nullable = true)
-    private String personalName;
+    private String personalName = "";
 
     @Builder.Default
     @Column(columnDefinition = "boolean default true")
