@@ -11,8 +11,9 @@ version = '0.0.1-SNAPSHOT'
 description = 'Projeto de musicas - Core System'
 
 java {
-	sourceCompatibility = JavaVersion.VERSION_21
-	targetCompatibility = JavaVersion.VERSION_21
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
 }
 
 configurations {
@@ -64,6 +65,7 @@ dependencies {
 	// 9. Serialização de Datas
 	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
 	implementation 'com.bucket4j:bucket4j-core:8.10.1'
+	compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
 }
 
 // 🛠️ Configuração Estratégica para Compilação

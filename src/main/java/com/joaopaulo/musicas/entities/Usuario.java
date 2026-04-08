@@ -57,11 +57,8 @@ public class Usuario {
     @Builder.Default
     private boolean ativo = true;
 
-    @Builder.Default
-    private boolean usernameChanged = false;
 
     private LocalDateTime ultimoLogin;
-    private LocalDateTime dataDesativacao;
 
     @Builder.Default
     private Integer tentativasFalhas = 0;
