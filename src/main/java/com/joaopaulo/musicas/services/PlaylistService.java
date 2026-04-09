@@ -6,16 +6,12 @@ import com.joaopaulo.musicas.exceptions.PlaylistNotFoundException;
 import com.joaopaulo.musicas.exceptions.SpotifyApiException;
 import com.joaopaulo.musicas.exceptions.UnauthorizedException;
 import com.joaopaulo.musicas.repositories.PlaylistRepository;
-import com.joaopaulo.musicas.security.UsuarioDetails;
-import com.joaopaulo.musicas.dtos.request.SpotifyImportDataRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import com.fasterxml.jackson.databind.JsonNode;
-import org.springframework.http.MediaType;
 
 import java.util.List;
 import java.util.Optional;
