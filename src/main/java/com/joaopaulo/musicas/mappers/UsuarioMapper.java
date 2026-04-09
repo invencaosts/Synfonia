@@ -10,7 +10,6 @@ import org.mapstruct.Named;
 public interface UsuarioMapper {
 
     @org.mapstruct.Mapping(target = "personalName", defaultValue = "")
-    @org.mapstruct.Mapping(target = "personalName", defaultValue = "")
     Usuario toEntity(UsuarioRequest request);
 
     UsuarioResponse toResponse(Usuario entity);
