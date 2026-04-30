@@ -63,8 +63,9 @@ public class UserSongController {
 
     @Operation(summary = "Obter apenas os IDs das músicas salvas no perfil")
     @GetMapping("/ids")
-    public ResponseEntity<java.util.List<String>> obterIdsFavoritos() {
+    public ResponseEntity<java.util.List<String>> obterIdsFavoritos(
+            @RequestParam(value = "excludeSource", required = false) MusicSource excludeSource) {
         Long userId = userSongService.getLoggedUserId();
-        return ResponseEntity.ok(userSongService.getFavoriteTrackIds(userId));
+        return ResponseEntity.ok(userSongService.getFavoriteTrackIds(userId, excludeSource));
     }
 }

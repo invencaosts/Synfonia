@@ -137,14 +137,22 @@ public class UserSongService {
         return userSongRepository.findByUserIdAndTrackId(userId, trackId);
     }
 
-    public java.util.List<String> getFavoriteTrackIds(Long userId) {
+    public java.util.List<String> getFavoriteTrackIds(Long userId, MusicSource excludeSource) {
         if (userId == null) {
             return java.util.Collections.emptyList();
         }
         if (!usuarioRepository.existsById(userId)) {
-            throw new UsuarioNaoEncontradoException("Usuário não encontrado");
+            throw new com.joaopaulo.musicas.exceptions.UsuarioNaoEncontradoException("Usuário não encontrado");
         }
-        return userSongRepository.findTrackIdsByUserId(userId).stream()
+        
+        java.util.List<UserSong> songs;
+        if (excludeSource != null) {
+            songs = userSongRepository.findTrackIdsByUserIdAndSourceNot(userId, excludeSource);
+        } else {
+            songs = userSongRepository.findTrackIdsByUserId(userId);
+        }
+        
+        return songs.stream()
                 .map(UserSong::getTrackId)
                 .toList();
     }
