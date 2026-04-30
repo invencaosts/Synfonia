@@ -276,7 +276,7 @@ public class PlaylistService {
         if (auth == null || !(auth.getPrincipal() instanceof com.joaopaulo.musicas.security.UsuarioDetails details)) {
             throw new UnauthorizedException("Usuário não está autenticado");
         }
-        return null;
+        return details.getId();
     }
 
     @SuppressWarnings("null")
@@ -285,8 +285,10 @@ public class PlaylistService {
                 .orElseThrow(() -> new PlaylistNotFoundException(PLAYLIST_NOT_FOUND));
         
         Long loggedUserId = getLoggedUserId();
-        if (!playlist.getUserId().equals(loggedUserId)) {
-            log.warn("Tentativa de acesso não autorizado: Usuário {} tentou modificar a playlist {} do usuário {}", 
+        
+        // Proteção contra NullPointerException e garantia de posse
+        if (playlist.getUserId() == null || !playlist.getUserId().equals(loggedUserId)) {
+            log.warn("Tentativa de acesso não autorizado: Usuário {} tentou modificar a playlist {} (Dono: {})", 
                     loggedUserId, playlistId, playlist.getUserId());
             throw new UnauthorizedException("Você não tem permissão para modificar esta playlist");
         }

@@ -64,6 +64,11 @@ public class MusicService {
                 });
     }
 
+    public List<MusicEntity> findAllByIds(List<String> ids) {
+        if (ids == null || ids.isEmpty()) return Collections.emptyList();
+        return musicRepository.findAllById(ids);
+    }
+
     // Novo método para quando REALMENTE precisamos tentar um fallback de preview
     @SuppressWarnings("null")
     public MusicEntity findByIdWithPreviewFallback(String id) {
