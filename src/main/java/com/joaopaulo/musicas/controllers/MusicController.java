@@ -39,4 +39,11 @@ public class MusicController {
         var entity = musicService.findById(id);
         return ResponseEntity.ok(musicMapper.toResponse(entity));
     }
+
+    @Operation(summary = "Busca múltiplas músicas pelos IDs internos (Batch)")
+    @PostMapping("/batch")
+    public ResponseEntity<List<MusicResponse>> getByIds(@RequestBody List<String> ids) {
+        var entities = musicService.findAllByIds(ids);
+        return ResponseEntity.ok(musicMapper.toResponseList(entities));
+    }
 }
