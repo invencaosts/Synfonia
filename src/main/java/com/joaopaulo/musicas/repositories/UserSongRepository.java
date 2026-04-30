@@ -29,5 +29,8 @@ public interface UserSongRepository extends MongoRepository<UserSong, String> {
     @Query(value = "{ 'userId': ?0 }", fields = "{ 'trackId': 1, '_id': 0 }")
     java.util.List<UserSong> findTrackIdsByUserId(Long userId);
 
+    @Query(value = "{ 'userId': ?0, 'source': { $ne: ?1 } }", fields = "{ 'trackId': 1, '_id': 0 }")
+    java.util.List<UserSong> findTrackIdsByUserIdAndSourceNot(Long userId, MusicSource source);
+
     void deleteAllByUserId(Long userId);
 }
