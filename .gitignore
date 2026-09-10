@@ -4,7 +4,6 @@ build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
-
 ### STS ###
 .apt_generated
 .classpath
@@ -61,6 +60,7 @@ compile_log.txt
 ### Sensitive and Data ###
 .env
 .env.*
+!.env.example
 .env.local
 .env.*.local
 gradle.properties
@@ -73,7 +73,6 @@ sonar-project.properties
 ### Spring Boot ###
 application.properties.local
 application-local.properties
-application-dev.properties
 
 ### OS specific ###
 .DS_Store
