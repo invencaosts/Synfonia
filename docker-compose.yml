@@ -1,89 +1,103 @@
-version: '3.9'
-
 services:
-  # =========== PostgreSQL para dados da aplicação ===========
   postgres:
     image: postgres:16-alpine
     container_name: musicas_postgres
     environment:
-      POSTGRES_DB: db_usuarios_musicas
-      POSTGRES_USER: musicas_user
+      POSTGRES_DB: ${DB_NAME:-db_usuarios_musicas}
+      POSTGRES_USER: ${DB_USER:-musicas_user}
       POSTGRES_PASSWORD: ${DB_PASS}
       POSTGRES_INITDB_ARGS: "-c client_encoding=UTF8 -c timezone=America/Sao_Paulo"
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./create_db_local.sql:/docker-entrypoint-initdb.d/01-init.sql
     networks:
       - musicas_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U musicas_user -d db_usuarios_musicas"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # =========== MongoDB para cache e históricos ===========
   mongodb:
     image: mongo:7.0
     container_name: musicas_mongodb
     environment:
-      MONGO_INITDB_DATABASE: musicas
-      MONGO_INITDB_ROOT_USERNAME: mongo_user
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-musicas}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-mongo_user}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
     ports:
-      - "27017:27017"
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
     volumes:
       - mongo_data:/data/db
     networks:
       - musicas_network
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017 -u ${MONGO_INITDB_ROOT_USERNAME} -p ${MONGO_PASSWORD} --authenticationDatabase admin
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --quiet --host localhost --port 27017
+          --username "$$MONGO_INITDB_ROOT_USERNAME"
+          --password "$$MONGO_INITDB_ROOT_PASSWORD"
+          --authenticationDatabase admin
+          --eval 'quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)'
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # =========== SonarQube para análise de código ===========
+  sonar-postgres:
+    image: postgres:16-alpine
+    container_name: musicas_sonar_postgres
+    profiles: ["quality"]
+    environment:
+      POSTGRES_DB: ${SONAR_DB_NAME:-sonarqube}
+      POSTGRES_USER: ${SONAR_DB_USER:-sonar_user}
+      POSTGRES_PASSWORD: ${SONAR_DB_PASS:-sonar_local_change_me}
+    volumes:
+      - sonar_postgres_data:/var/lib/postgresql/data
+    networks:
+      - musicas_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   sonarqube:
     image: sonarqube:lts-alpine
     container_name: musicas_sonarqube
+    profiles: ["quality"]
     environment:
-      SONAR_JDBC_URL: jdbc:postgresql://postgres:5432/sonarqube
-      SONAR_JDBC_USERNAME: sonar_user
-      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASS}
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-postgres:5432/${SONAR_DB_NAME:-sonarqube}
+      SONAR_JDBC_USERNAME: ${SONAR_DB_USER:-sonar_user}
+      SONAR_JDBC_PASSWORD: ${SONAR_DB_PASS:-sonar_local_change_me}
       SONAR_ES_BOOTSTRAP_CHECKS_DISABLED: "true"
-      SONAR_FORCEAUTHENTICATION: "false"
     ports:
-      - "9000:9000"
+      - "127.0.0.1:9000:9000"
     volumes:
       - sonarqube_data:/opt/sonarqube/data
       - sonarqube_extensions:/opt/sonarqube/extensions
       - sonarqube_logs:/opt/sonarqube/logs
     depends_on:
-      postgres:
+      sonar-postgres:
         condition: service_healthy
     networks:
       - musicas_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/api/system/health"]
+      test: ["CMD-SHELL", "wget --no-proxy -qO- http://localhost:9000/api/system/status | grep -q '\"status\":\"UP\"'"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 40s
+      start_period: 60s
 
 volumes:
   postgres_data:
-    driver: local
   mongo_data:
-    driver: local
+  sonar_postgres_data:
   sonarqube_data:
-    driver: local
   sonarqube_extensions:
-    driver: local
   sonarqube_logs:
-    driver: local
 
 networks:
   musicas_network:
     driver: bridge
-
