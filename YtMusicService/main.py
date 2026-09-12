@@ -1,10 +1,18 @@
 import re
+import time
 
-from fastapi import FastAPI
+from fastapi import Body, FastAPI, HTTPException
+from pydantic import BaseModel
 from ytmusicapi import YTMusic
+from ytmusicapi.auth.oauth import OAuthCredentials
 
 app = FastAPI(title="Synfonia YT Music Service")
 yt = YTMusic()
+
+# Client "TV/dispositivo de entrada limitada" público, mantido pela própria
+# ytmusicapi. Não é segredo (é o mesmo client usado por qualquer instalação
+# da lib) — dá pra trocar por um client próprio via env se algum dia precisar.
+oauth_credentials = OAuthCredentials()
 
 FILTER_MAP = {
     "title": "songs",
@@ -109,6 +117,126 @@ def get_track(video_id: str):
         "uri": f"https://music.youtube.com/watch?v={video_id}",
         "source": "YOUTUBE_MUSIC",
     }
+
+
+def normalize_playlist(item):
+    playlist_id = item.get("playlistId")
+    return {
+        "id": playlist_id,
+        "nome": item.get("title"),
+        "capaUrl": best_thumbnail(item.get("thumbnails")),
+        "totalFaixas": item.get("count"),
+        "uri": f"https://music.youtube.com/playlist?list={playlist_id}" if playlist_id else None,
+        "source": "YOUTUBE_MUSIC",
+    }
+
+
+class DevicePollRequest(BaseModel):
+    device_code: str
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class TokenRequest(BaseModel):
+    token: dict
+
+
+def build_token_dict(raw: dict, previous_refresh_token: str | None = None):
+    if "error" in raw:
+        return None
+    token = dict(raw)
+    token["expires_at"] = int(time.time()) + int(token.get("expires_in", 0))
+    # A resposta de refresh do Google normalmente não devolve refresh_token de novo (reaproveita o antigo).
+    token.setdefault("refresh_token", previous_refresh_token)
+    return token
+
+
+def authenticated_client(token: dict):
+    if not token or not token.get("access_token"):
+        raise HTTPException(status_code=401, detail="Token do YouTube Music ausente ou inválido.")
+    return YTMusic(auth=token, oauth_credentials=oauth_credentials)
+
+
+@app.post("/auth/device/start")
+def start_device_auth():
+    """Primeiro passo do fluxo OAuth estilo TV: gera o código que o usuário digita em google.com/device."""
+    try:
+        code = oauth_credentials.get_code()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Falha ao iniciar autenticação com o Google: {e}")
+    return code
+
+
+@app.post("/auth/device/poll")
+def poll_device_auth(payload: DevicePollRequest):
+    """Segundo passo: verifica se o usuário já autorizou o device_code."""
+    try:
+        raw = oauth_credentials.token_from_code(payload.device_code)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Falha ao consultar autorização: {e}")
+
+    if "error" in raw:
+        # authorization_pending / slow_down são esperados enquanto o usuário não autorizou ainda.
+        return {"status": "pending", "reason": raw.get("error")}
+
+    token = build_token_dict(raw)
+    return {"status": "authorized", "token": token}
+
+
+@app.post("/auth/refresh")
+def refresh_auth(payload: RefreshRequest):
+    try:
+        raw = oauth_credentials.refresh_token(payload.refresh_token)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Falha ao renovar token: {e}")
+
+    token = build_token_dict(raw, previous_refresh_token=payload.refresh_token)
+    if token is None:
+        raise HTTPException(status_code=401, detail=f"Refresh token inválido/expirado: {raw.get('error')}")
+    return {"token": token}
+
+
+@app.post("/me/playlists")
+def get_my_playlists(payload: TokenRequest = Body(...)):
+    client = authenticated_client(payload.token)
+    try:
+        playlists = client.get_library_playlists(limit=50)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Falha ao buscar playlists: {e}")
+    return [normalize_playlist(p) for p in playlists]
+
+
+@app.post("/me/playlists/{playlist_id}/tracks")
+def get_playlist_tracks(playlist_id: str, payload: TokenRequest = Body(...)):
+    client = authenticated_client(payload.token)
+    try:
+        data = client.get_playlist(playlist_id, limit=None)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Falha ao buscar faixas da playlist: {e}")
+    tracks = data.get("tracks", [])
+    return [normalize(t) for t in tracks if t.get("videoId")]
+
+
+@app.post("/me/account")
+def get_account(payload: TokenRequest = Body(...)):
+    client = authenticated_client(payload.token)
+    try:
+        return client.get_account_info()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Falha ao buscar dados da conta: {e}")
+
+
+@app.post("/me/liked-songs")
+def get_my_liked_songs(payload: TokenRequest = Body(...)):
+    client = authenticated_client(payload.token)
+    try:
+        data = client.get_liked_songs(limit=100)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Falha ao buscar músicas curtidas: {e}")
+    tracks = data.get("tracks", [])
+    return [normalize(t) for t in tracks if t.get("videoId")]
 
 
 @app.get("/health")
