@@ -104,13 +104,17 @@ public class AuthController {
     @SuppressWarnings("null")
     private ResponseCookie createCookie(HttpServletRequest request, String name, String value, long maxAge) {
         String serverName = request.getServerName();
-        // Chrome exige SameSite=None e Secure=true para aceitar cookies entre portas diferentes (5173 -> 8080)
-        // O Chrome permite Secure=true em http://localhost.
-        String sameSite = "None";
-        boolean secure = true;
+        // Cookie "Secure" só é aceito pelo navegador em HTTPS (localhost é a
+        // única exceção especial). Como o frontend agora acessa a API pelo
+        // proxy do Vite (mesma origem, sem CORS), SameSite=None+Secure só é
+        // necessário quando a conexão real é HTTPS; em HTTP local (inclusive
+        // por IP de rede), Lax sem Secure funciona e é o que o navegador aceita.
+        boolean isHttps = request.isSecure() || "https".equalsIgnoreCase(request.getHeader("X-Forwarded-Proto"));
+        String sameSite = isHttps ? "None" : "Lax";
+        boolean secure = isHttps;
 
-        log.info("[CookieService] FORCANDO SEGURANÇA MAXIMA. Cookie '{}'. Server: {}, SameSite: {}, Secure: {}", 
-                 name, serverName, sameSite, secure);
+        log.info("[CookieService] Cookie '{}'. Server: {}, HTTPS: {}, SameSite: {}, Secure: {}",
+                 name, serverName, isHttps, sameSite, secure);
 
         return ResponseCookie.from(name, value)
                 .httpOnly(true)
