@@ -2,7 +2,9 @@ package com.joaopaulo.musicas.services;
 
 import com.joaopaulo.musicas.dtos.request.MusicRequest;
 import com.joaopaulo.musicas.dtos.wrapper.ItunesSearchWrapper;
+import com.joaopaulo.musicas.dtos.wrapper.YtMusicTrackResponse;
 import com.joaopaulo.musicas.entities.MusicEntity;
+import com.joaopaulo.musicas.enums.MusicSource;
 import com.joaopaulo.musicas.exceptions.ExternalServiceException;
 import com.joaopaulo.musicas.exceptions.IllegalMusicArgumentsException;
 import com.joaopaulo.musicas.exceptions.MusicNotFoundException;
@@ -10,6 +12,7 @@ import com.joaopaulo.musicas.mappers.MusicMapper;
 import com.joaopaulo.musicas.repositories.MusicRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -25,27 +28,60 @@ public class MusicService {
     private final MusicMapper musicMapper;
     private final RestClient restClient;
 
+    @Value("${ytmusic.service.url}")
+    private String ytMusicServiceUrl;
+
     private static final String ALBUM = "album";
     private static final String ARTIST = "artist";
     private static final String TITLE = "title";
 
-    public List<MusicEntity> searchByFilter(String nome, String artista, String album, String tipo, Integer limit) {
+    public List<MusicEntity> searchByFilter(String nome, String artista, String album, String tipo, Integer limit, MusicSource source) {
         MusicRequest request = new MusicRequest(nome, artista, album, limit);
         validateRequest(request);
 
-        log.info("Iniciando busca por filtro [{}]: {}", tipo, request.getTrackName());
+        log.info("Iniciando busca por filtro [{}] na fonte [{}]: {}", tipo, source, request.getTrackName());
 
         List<MusicEntity> externalResults;
         try {
-            externalResults = fetchFromAppleWithAttribute(request, tipo);
+            externalResults = source == MusicSource.YOUTUBE_MUSIC
+                    ? fetchFromYtMusic(request, tipo)
+                    : fetchFromAppleWithAttribute(request, tipo);
         } catch (Exception e) {
-            log.warn("Falha na busca externa (Apple): {}. Retornando apenas resultados locais.", e.getMessage());
+            log.warn("Falha na busca externa ({}): {}. Retornando apenas resultados locais.", source, e.getMessage());
             externalResults = Collections.emptyList();
         }
 
         // Retornamos os resultados externos diretamente, sem priorizar a biblioteca local.
         // A sinalização visual (ícone de coração vs check) continuará funcionando no frontend via ID.
         return sortResultsByRelevance(externalResults, request.getTrackName(), tipo);
+    }
+
+    private List<MusicEntity> fetchFromYtMusic(MusicRequest request, String tipo) {
+        try {
+            List<YtMusicTrackResponse> results = restClient.get()
+                    .uri(ytMusicServiceUrl + "/search?q={q}&tipo={tipo}&limit={limit}",
+                            request.getTrackName(), tipo, request.getLimit())
+                    .retrieve()
+                    .body(new org.springframework.core.ParameterizedTypeReference<List<YtMusicTrackResponse>>() {});
+
+            if (results == null) return Collections.emptyList();
+
+            return results.stream()
+                    .map(dto -> MusicEntity.builder()
+                            .id(dto.getId())
+                            .nome(dto.getNome())
+                            .artista(dto.getArtista())
+                            .album(dto.getAlbum())
+                            .capaUrl(dto.getCapaUrl())
+                            .previewUrl(dto.getPreviewUrl())
+                            .uri(dto.getUri())
+                            .source(MusicSource.YOUTUBE_MUSIC)
+                            .build())
+                    .toList();
+        } catch (Exception e) {
+            log.error("Erro na integração externa com YT Music: {}", e.getMessage(), e);
+            throw new ExternalServiceException("Erro ao processar a busca no provedor externo (YT Music).");
+        }
     }
 
     private void validateRequest(MusicRequest request) {
