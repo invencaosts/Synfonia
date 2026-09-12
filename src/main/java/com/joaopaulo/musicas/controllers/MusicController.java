@@ -1,6 +1,7 @@
 package com.joaopaulo.musicas.controllers;
 
 import com.joaopaulo.musicas.dtos.response.MusicResponse;
+import com.joaopaulo.musicas.enums.MusicSource;
 import com.joaopaulo.musicas.mappers.MusicMapper;
 import com.joaopaulo.musicas.services.MusicService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,9 +28,10 @@ public class MusicController {
             @RequestParam("nome") String nome,
             @RequestParam(value = "artista", required = false) String artista,
             @RequestParam(value = "album", required = false) String album,
-            @RequestParam(value = "tipo", defaultValue = "all") String tipo) {
+            @RequestParam(value = "tipo", defaultValue = "all") String tipo,
+            @RequestParam(value = "source", defaultValue = "ITUNES") MusicSource source) {
 
-        var entities = musicService.searchByFilter(nome, artista, album, tipo, 100);
+        var entities = musicService.searchByFilter(nome, artista, album, tipo, 100, source);
         return ResponseEntity.ok(musicMapper.toResponseList(entities));
     }
 

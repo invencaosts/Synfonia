@@ -45,6 +45,21 @@ services:
       timeout: 5s
       retries: 5
 
+  ytmusic:
+    build:
+      context: ./YtMusicService
+      dockerfile: Dockerfile
+    container_name: musicas_ytmusic
+    ports:
+      - "127.0.0.1:${YTMUSIC_PORT:-8001}:8001"
+    networks:
+      - musicas_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
   sonar-postgres:
     image: postgres:16-alpine
     container_name: musicas_sonar_postgres
