@@ -12,7 +12,17 @@ public interface UsuarioMapper {
     @org.mapstruct.Mapping(target = "personalName", defaultValue = "")
     Usuario toEntity(UsuarioRequest request);
 
+    @org.mapstruct.Mapping(target = "socialLinks", expression = "java(buildSocialLinks(entity))")
     UsuarioResponse toResponse(Usuario entity);
+
+    @Named("buildSocialLinks")
+    default java.util.Map<String, String> buildSocialLinks(Usuario entity) {
+        java.util.Map<String, String> links = new java.util.HashMap<>();
+        if (entity.getInstagramLink() != null) links.put("instagram", entity.getInstagramLink());
+        if (entity.getSpotifyLink() != null) links.put("spotify", entity.getSpotifyLink());
+        if (entity.getYoutubeLink() != null) links.put("youtube", entity.getYoutubeLink());
+        return links;
+    }
 
     @Named("usuarioToUsuarioResponse")
     default UsuarioResponse usuarioToUsuarioResponse(Usuario usuario) {

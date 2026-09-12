@@ -32,4 +32,7 @@ public class UsuarioResponse {
     
     private String fotoPerfil;
     private boolean usernameChanged;
+
+    private java.util.Map<String, String> socialLinks;
+    private com.joaopaulo.musicas.enums.MusicSource preferredMusicSource;
 }

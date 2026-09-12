@@ -99,7 +99,33 @@ public class UsuarioService {
             }
         }
         
+        if (profileData.containsKey("preferredMusicSource")) {
+            String rawSource = asString(profileData.get("preferredMusicSource"));
+            if (rawSource != null) {
+                try {
+                    usuario.setPreferredMusicSource(com.joaopaulo.musicas.enums.MusicSource.valueOf(rawSource));
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException("Fonte de música inválida: " + rawSource);
+                }
+            }
+        }
+
+        if (profileData.containsKey("socialLinks")) {
+            Object rawLinks = profileData.get("socialLinks");
+            if (rawLinks instanceof Map<?, ?> links) {
+                usuario.setInstagramLink(asString(links.get("instagram")));
+                usuario.setSpotifyLink(asString(links.get("spotify")));
+                usuario.setYoutubeLink(asString(links.get("youtube")));
+            }
+        }
+
         return usuarioRepository.save(usuario);
+    }
+
+    private String asString(Object value) {
+        if (value == null) return null;
+        String str = value.toString().trim();
+        return str.isEmpty() ? null : str;
     }
 
     public void deactivateAccount() {
