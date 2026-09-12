@@ -1,16 +1,22 @@
 package com.synfonia.musicas.services;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.synfonia.musicas.entities.YtMusicCredential;
 import com.synfonia.musicas.exceptions.UnauthorizedException;
 import com.synfonia.musicas.repositories.YtMusicCredentialRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -24,8 +30,17 @@ import java.util.Map;
 @Slf4j
 public class YtMusicAuthService {
 
+    // Cliente HTTP dedicado (java.net.http), sem passar pelos conversores
+    // customizados do RestClient compartilhado (que quebravam o corpo JSON
+    // dessas chamadas de forma silenciosa).
+    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
+            // uvicorn só fala HTTP/1.1; a negociação HTTP/2 padrão do HttpClient
+            // confundia o parser dele ("Invalid HTTP request received").
+            .version(HttpClient.Version.HTTP_1_1)
+            .build();
+
     private final YtMusicCredentialRepository credentialRepository;
-    private final RestClient restClient;
+    private final ObjectMapper objectMapper;
 
     @Value("${ytmusic.service.url}")
     private String ytMusicServiceUrl;
@@ -59,15 +74,20 @@ public class YtMusicAuthService {
 
     private YtMusicCredential refresh(YtMusicCredential credential) {
         try {
-            var response = restClient.post()
-                    .uri(ytMusicServiceUrl + "/auth/refresh")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("refresh_token", credential.getRefreshToken()))
-                    .retrieve()
-                    .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+            String json = objectMapper.writeValueAsString(Map.of("refresh_token", credential.getRefreshToken()));
+            var request = HttpRequest.newBuilder()
+                    .uri(URI.create(ytMusicServiceUrl + "/auth/refresh"))
+                    .timeout(Duration.ofSeconds(30))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(json))
+                    .build();
+            HttpResponse<String> httpResponse = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            if (httpResponse.statusCode() >= 400) {
+                throw new RuntimeException("YtMusicService /auth/refresh respondeu " + httpResponse.statusCode() + ": " + httpResponse.body());
+            }
 
-            @SuppressWarnings("unchecked")
-            Map<String, Object> token = (Map<String, Object>) response.get("token");
+            JsonNode responseNode = objectMapper.readTree(httpResponse.body());
+            Map<String, Object> token = objectMapper.convertValue(responseNode.get("token"), new TypeReference<Map<String, Object>>() {});
 
             YtMusicCredential updated = toEntity(credential.getUsuarioId(), token);
             return credentialRepository.save(updated);

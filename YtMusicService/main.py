@@ -1,5 +1,6 @@
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import Body, FastAPI, HTTPException
 from pydantic import BaseModel
@@ -92,12 +93,16 @@ def search(q: str, tipo: str = "all", limit: int = 20):
         # Sem filter=None: essa chamada aciona o parser de "top result" da
         # ytmusicapi, que quebra (KeyError: 'header') com o layout atual do
         # YouTube Music. Buscamos songs/albums/artists em separado e juntamos.
-        results = []
-        for f in ("songs", "albums", "artists"):
+        # Em paralelo (cada uma é uma chamada de rede independente) — feito
+        # sequencial, essa busca levava 3x o tempo de uma busca com filtro.
+        def safe_search(f):
             try:
-                results.extend(yt.search(q, filter=f, limit=limit))
+                return yt.search(q, filter=f, limit=limit)
             except Exception:
-                continue
+                return []
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            results = [item for sublist in executor.map(safe_search, ("songs", "albums", "artists")) for item in sublist]
 
     normalized = [normalize(r) for r in results]
     return [r for r in normalized if r["id"]]
@@ -115,18 +120,6 @@ def get_track(video_id: str):
         "capaUrl": best_thumbnail(details.get("thumbnail", {}).get("thumbnails")),
         "previewUrl": None,
         "uri": f"https://music.youtube.com/watch?v={video_id}",
-        "source": "YOUTUBE_MUSIC",
-    }
-
-
-def normalize_playlist(item):
-    playlist_id = item.get("playlistId")
-    return {
-        "id": playlist_id,
-        "nome": item.get("title"),
-        "capaUrl": best_thumbnail(item.get("thumbnails")),
-        "totalFaixas": item.get("count"),
-        "uri": f"https://music.youtube.com/playlist?list={playlist_id}" if playlist_id else None,
         "source": "YOUTUBE_MUSIC",
     }
 
@@ -198,45 +191,17 @@ def refresh_auth(payload: RefreshRequest):
     return {"token": token}
 
 
-@app.post("/me/playlists")
-def get_my_playlists(payload: TokenRequest = Body(...)):
-    client = authenticated_client(payload.token)
-    try:
-        playlists = client.get_library_playlists(limit=50)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Falha ao buscar playlists: {e}")
-    return [normalize_playlist(p) for p in playlists]
-
-
-@app.post("/me/playlists/{playlist_id}/tracks")
-def get_playlist_tracks(playlist_id: str, payload: TokenRequest = Body(...)):
-    client = authenticated_client(payload.token)
-    try:
-        data = client.get_playlist(playlist_id, limit=None)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Falha ao buscar faixas da playlist: {e}")
-    tracks = data.get("tracks", [])
-    return [normalize(t) for t in tracks if t.get("videoId")]
-
-
 @app.post("/me/account")
 def get_account(payload: TokenRequest = Body(...)):
     client = authenticated_client(payload.token)
     try:
         return client.get_account_info()
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Falha ao buscar dados da conta: {e}")
-
-
-@app.post("/me/liked-songs")
-def get_my_liked_songs(payload: TokenRequest = Body(...)):
-    client = authenticated_client(payload.token)
-    try:
-        data = client.get_liked_songs(limit=100)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Falha ao buscar músicas curtidas: {e}")
-    tracks = data.get("tracks", [])
-    return [normalize(t) for t in tracks if t.get("videoId")]
+    except Exception:
+        # get_account_info quebra pra contas onde o menu do YouTube não tem
+        # o layout que a ytmusicapi espera (varia por conta/região). Não é
+        # crítico — só alimenta o auto-preenchimento do link social — então
+        # falha graciosamente em vez de estourar erro pro usuário.
+        return {"accountName": None, "channelHandle": None, "accountPhotoUrl": None}
 
 
 @app.get("/health")
