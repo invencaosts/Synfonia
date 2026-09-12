@@ -71,6 +71,14 @@ public class Usuario {
     private String favoriteTrackArtist;
     private String favoriteTrackCapaUrl;
     private String favoriteTrackPreviewUrl;
+
+    private String instagramLink;
+    private String spotifyLink;
+    private String youtubeLink;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    private com.joaopaulo.musicas.enums.MusicSource preferredMusicSource = com.joaopaulo.musicas.enums.MusicSource.ITUNES;
     
     @Column(columnDefinition = "TEXT")
     private String fotoPerfil;
