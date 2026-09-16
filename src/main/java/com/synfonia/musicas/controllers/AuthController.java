@@ -21,6 +21,9 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
@@ -40,10 +43,10 @@ public class AuthController {
 
     @Operation(summary = "Login de usuário")
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest, HttpServletResponse response) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest, HttpServletResponse response) {
         log.info("[AuthController] Tentativa de login para: {}", request.getEmail());
         LoginResponse loginResponse = authService.login(request);
-        
+
         // OPÇÃO NUCLEAR: Limpar cookies fantasmas de sessões anteriores/outros paths
         ResponseCookie deleteAccess = ResponseCookie.from("synfonia_access", "").path("/").maxAge(0).build();
         ResponseCookie deleteRefresh = ResponseCookie.from("synfonia_refresh", "").path("/").maxAge(0).build();
@@ -56,6 +59,17 @@ public class AuthController {
 
         response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
         response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
+
+        // App nativo (Capacitor) roda em origem própria: cookie cross-site com SameSite=Lax
+        // não é enviado nas requisições seguintes. Nesse caso, devolve o token no corpo
+        // para o app guardar e enviar via header Authorization.
+        if ("capacitor".equalsIgnoreCase(httpRequest.getHeader("X-Client-Platform"))) {
+            Map<String, Object> nativeBody = new HashMap<>();
+            nativeBody.put("token", loginResponse.getToken());
+            nativeBody.put("refreshToken", loginResponse.getRefreshToken());
+            nativeBody.put("usuario", loginResponse.getUsuario());
+            return ResponseEntity.ok(nativeBody);
+        }
 
         return ResponseEntity.ok(loginResponse);
     }
