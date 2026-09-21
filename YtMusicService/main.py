@@ -108,6 +108,35 @@ def search(q: str, tipo: str = "all", limit: int = 20):
     return [r for r in normalized if r["id"]]
 
 
+@app.get("/album/{browse_id}")
+def get_album(browse_id: str):
+    try:
+        data = yt.get_album(browse_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Álbum não encontrado")
+
+    capa = best_thumbnail(data.get("thumbnails"))
+    album_title = data.get("title")
+    album_artists = artist_names(data.get("artists"))
+
+    resultado = []
+    for track in data.get("tracks") or []:
+        video_id = track.get("videoId")
+        if not video_id:
+            continue
+        resultado.append({
+            "id": video_id,
+            "nome": track.get("title"),
+            "artista": artist_names(track.get("artists")) or album_artists,
+            "album": album_title,
+            "capaUrl": capa,
+            "previewUrl": None,
+            "uri": f"https://music.youtube.com/watch?v={video_id}",
+            "source": "YOUTUBE_MUSIC",
+        })
+    return resultado
+
+
 @app.get("/track/{video_id}")
 def get_track(video_id: str):
     info = yt.get_song(video_id)

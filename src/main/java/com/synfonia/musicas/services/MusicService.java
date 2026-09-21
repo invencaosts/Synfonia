@@ -1,6 +1,7 @@
 package com.synfonia.musicas.services;
 
 import com.synfonia.musicas.dtos.request.MusicRequest;
+import com.synfonia.musicas.dtos.response.AlbumResponse;
 import com.synfonia.musicas.dtos.wrapper.ItunesSearchWrapper;
 import com.synfonia.musicas.dtos.wrapper.YtMusicTrackResponse;
 import com.synfonia.musicas.entities.MusicEntity;
@@ -10,14 +11,23 @@ import com.synfonia.musicas.exceptions.IllegalMusicArgumentsException;
 import com.synfonia.musicas.exceptions.MusicNotFoundException;
 import com.synfonia.musicas.mappers.MusicMapper;
 import com.synfonia.musicas.repositories.MusicRepository;
+import com.synfonia.musicas.util.AlbumKeyUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -35,25 +45,136 @@ public class MusicService {
     private static final String ARTIST = "artist";
     private static final String TITLE = "title";
 
+    // Hosts de CDN de capa de álbum conhecidos (iTunes/Apple e YouTube Music).
+    // Allowlist obrigatória aqui: sem ela, este proxy vira um SSRF genérico.
+    private static final Set<String> ALLOWED_IMAGE_HOSTS = Set.of(
+            "mzstatic.com", "googleusercontent.com", "ytimg.com", "ggpht.com"
+    );
+
+    public ResponseEntity<byte[]> proxyImagem(String url) {
+        URI uri;
+        try {
+            uri = URI.create(url);
+        } catch (Exception e) {
+            throw new IllegalMusicArgumentsException("URL de imagem inválida.");
+        }
+
+        String host = uri.getHost();
+        boolean permitido = host != null && ALLOWED_IMAGE_HOSTS.stream().anyMatch(host::endsWith);
+        if (!permitido) {
+            throw new IllegalMusicArgumentsException("Host de imagem não permitido.");
+        }
+
+        try {
+            ResponseEntity<byte[]> resposta = restClient.get()
+                    .uri(uri)
+                    .retrieve()
+                    .toEntity(byte[].class);
+
+            MediaType contentType = resposta.getHeaders().getContentType() != null
+                    ? resposta.getHeaders().getContentType()
+                    : MediaType.IMAGE_JPEG;
+
+            return ResponseEntity.ok()
+                    .contentType(contentType)
+                    .header(HttpHeaders.CACHE_CONTROL, "public, max-age=86400")
+                    .body(resposta.getBody());
+        } catch (Exception e) {
+            log.warn("Falha ao fazer proxy de imagem {}: {}", url, e.getMessage());
+            throw new ExternalServiceException("Não foi possível carregar a imagem.");
+        }
+    }
+
     public List<MusicEntity> searchByFilter(String nome, String artista, String album, String tipo, Integer limit, MusicSource source) {
         MusicRequest request = new MusicRequest(nome, artista, album, limit);
         validateRequest(request);
 
         log.info("Iniciando busca por filtro [{}] na fonte [{}]: {}", tipo, source, request.getTrackName());
 
-        List<MusicEntity> externalResults;
-        try {
-            externalResults = source == MusicSource.YOUTUBE_MUSIC
-                    ? fetchFromYtMusic(request, tipo)
-                    : fetchFromAppleWithAttribute(request, tipo);
-        } catch (Exception e) {
-            log.warn("Falha na busca externa ({}): {}. Retornando apenas resultados locais.", source, e.getMessage());
-            externalResults = Collections.emptyList();
-        }
+        List<MusicEntity> externalResults = fetchExternal(request, tipo, source);
 
         // Retornamos os resultados externos diretamente, sem priorizar a biblioteca local.
         // A sinalização visual (ícone de coração vs check) continuará funcionando no frontend via ID.
         return sortResultsByRelevance(externalResults, request.getTrackName(), tipo);
+    }
+
+    private List<MusicEntity> fetchExternal(MusicRequest request, String tipo, MusicSource source) {
+        try {
+            return source == MusicSource.YOUTUBE_MUSIC
+                    ? fetchFromYtMusic(request, tipo)
+                    : fetchFromAppleWithAttribute(request, tipo);
+        } catch (Exception e) {
+            log.warn("Falha na busca externa ({}): {}. Retornando apenas resultados locais.", source, e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    public List<AlbumResponse> searchAlbums(String nome, MusicSource source) {
+        MusicRequest request = new MusicRequest(nome, null, null, 50);
+        validateRequest(request);
+
+        // Não reutilizamos sortResultsByRelevance aqui: aquele filtro exige a frase de busca
+        // inteira como substring contígua de um único campo, o que descarta álbuns legítimos
+        // sempre que o título da busca não bate palavra-por-palavra com o catálogo externo
+        // (ordem de palavras, acentos, "feat.", etc.). Para álbuns confiamos no próprio
+        // ranking de relevância da API externa (iTunes/YT Music).
+        List<MusicEntity> faixas = fetchExternal(request, ALBUM, source);
+
+        Map<String, AlbumResponse> agrupadoPorAlbum = new LinkedHashMap<>();
+        for (MusicEntity musica : faixas) {
+            if (musica.getAlbum() == null || musica.getAlbum().isBlank()) continue;
+
+            String albumKey = AlbumKeyUtil.gerarChave(musica.getSource(), musica.getArtista(), musica.getAlbum());
+            agrupadoPorAlbum.putIfAbsent(albumKey, AlbumResponse.builder()
+                    .albumKey(albumKey)
+                    .artista(musica.getArtista())
+                    .albumName(musica.getAlbum())
+                    .capaUrl(musica.getCapaUrl())
+                    .source(musica.getSource())
+                    // No YT Music, a busca com tipo=album já retorna ÁLBUNS (não faixas),
+                    // e o "id" desse resultado é o browseId real do álbum — guardamos para
+                    // buscar a tracklist completa depois via buscarFaixasDoAlbum. O iTunes
+                    // não expõe um id de álbum estável nesse fluxo (tipo=album lá retorna
+                    // faixas), então fica null e a tracklist é resolvida por nome+artista.
+                    .externalAlbumId(musica.getSource() == MusicSource.YOUTUBE_MUSIC ? musica.getId() : null)
+                    .build());
+        }
+        return new ArrayList<>(agrupadoPorAlbum.values());
+    }
+
+    public List<MusicEntity> buscarFaixasDoAlbum(String externalAlbumId, String artista, String albumName, MusicSource source) {
+        if (source == MusicSource.YOUTUBE_MUSIC && externalAlbumId != null && !externalAlbumId.isBlank()) {
+            return fetchAlbumTracksFromYtMusic(externalAlbumId);
+        }
+        // iTunes: attribute=albumTerm com entity=song já retorna as faixas corretas do álbum.
+        return searchByFilter(albumName, artista, albumName, ALBUM, 100, source);
+    }
+
+    private List<MusicEntity> fetchAlbumTracksFromYtMusic(String browseId) {
+        try {
+            List<YtMusicTrackResponse> results = restClient.get()
+                    .uri(ytMusicServiceUrl + "/album/{browseId}", browseId)
+                    .retrieve()
+                    .body(new org.springframework.core.ParameterizedTypeReference<List<YtMusicTrackResponse>>() {});
+
+            if (results == null) return Collections.emptyList();
+
+            return results.stream()
+                    .map(dto -> MusicEntity.builder()
+                            .id(dto.getId())
+                            .nome(dto.getNome())
+                            .artista(dto.getArtista())
+                            .album(dto.getAlbum())
+                            .capaUrl(dto.getCapaUrl())
+                            .previewUrl(dto.getPreviewUrl())
+                            .uri(dto.getUri())
+                            .source(MusicSource.YOUTUBE_MUSIC)
+                            .build())
+                    .toList();
+        } catch (Exception e) {
+            log.error("Erro ao buscar faixas do álbum no YT Music (browseId={}): {}", browseId, e.getMessage(), e);
+            throw new ExternalServiceException("Erro ao buscar faixas do álbum no provedor externo (YT Music).");
+        }
     }
 
     private List<MusicEntity> fetchFromYtMusic(MusicRequest request, String tipo) {

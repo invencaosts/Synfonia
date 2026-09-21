@@ -60,6 +60,11 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, "Recurso não encontrado", ex.getMessage(), request);
     }
 
+    @ExceptionHandler(AlbumRatingNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleAlbumRatingNotFound(AlbumRatingNotFoundException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.NOT_FOUND, "Avaliação não encontrada", ex.getMessage(), request);
+    }
+
     @ExceptionHandler(ExternalServiceException.class)
     public ResponseEntity<ErrorResponse> handleExternalService(ExternalServiceException ex, HttpServletRequest request) {
         log.error("Falha externa: {}", ex.getMessage());

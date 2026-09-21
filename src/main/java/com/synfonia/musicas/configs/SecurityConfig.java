@@ -96,6 +96,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/musicas/search").permitAll()
+                // Sem auth: <img> tags (inclusive no app nativo, que não anexa o Bearer token
+                // em requisições de imagem) precisam carregar isso direto.
+                .requestMatchers(HttpMethod.GET, "/api/v1/musicas/proxy-imagem").permitAll()
                 .requestMatchers("/api/v1/musicas/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/v1/spotify/callback").permitAll()
                 .requestMatchers("/api/v1/spotify/**").authenticated()
