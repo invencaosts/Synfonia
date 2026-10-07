@@ -65,6 +65,22 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, "Avaliação não encontrada", ex.getMessage(), request);
     }
 
+    @ExceptionHandler(PlaylistNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handlePlaylistNotFound(PlaylistNotFoundException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.NOT_FOUND, "Playlist não encontrada", ex.getMessage(), request);
+    }
+
+    // Ex.: ?sort=campoInexistente — antes (Mongo) era ignorado em silêncio; no JPA vira 400
+    @ExceptionHandler(org.springframework.data.mapping.PropertyReferenceException.class)
+    public ResponseEntity<ErrorResponse> handleOrdenacaoInvalida(org.springframework.data.mapping.PropertyReferenceException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, "Ordenação inválida", "Campo de ordenação inexistente: " + ex.getPropertyName(), request);
+    }
+
+    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
+    public ResponseEntity<ErrorResponse> handleRequisicaoInvalida(RuntimeException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, "Requisição inválida", ex.getMessage(), request);
+    }
+
     @ExceptionHandler(ExternalServiceException.class)
     public ResponseEntity<ErrorResponse> handleExternalService(ExternalServiceException ex, HttpServletRequest request) {
         log.error("Falha externa: {}", ex.getMessage());

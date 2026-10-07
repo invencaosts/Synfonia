@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -46,7 +47,7 @@ public class UserSongController {
     @GetMapping
     public ResponseEntity<Page<UserSongResponse>> listarMusicas(
             @RequestParam(value = "q", required = false) String searchTerm,
-            @PageableDefault(size = 50, sort = "dataAdicao,desc") Pageable pageable) {
+            @PageableDefault(size = 50, sort = "dataAdicao", direction = Sort.Direction.DESC) Pageable pageable) {
         
         Long userId = userSongService.getLoggedUserId();
         Page<UserSongResponse> musicas = userSongService.listarMusicas(userId, searchTerm, pageable);
