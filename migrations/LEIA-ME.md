@@ -4,7 +4,15 @@ Não há Flyway: os scripts são aplicados à mão, **antes** de subir o backend
 Em produção o Hibernate roda com `ddl-auto=validate` e o app **não sobe** se faltar tabela ou coluna.
 Todos os scripts são idempotentes (podem rodar mais de uma vez).
 
-## Ordem
+## Instalação nova (banco vazio)
+
+Rode só o schema completo e suba o app; o seed cria as contas fixas a partir de `SEED_*`:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f 2026-10-07_00_schema_base.sql
+```
+
+## Atualização de um banco existente — ordem
 
 | # | Arquivo | O que faz |
 |---|---------|-----------|
