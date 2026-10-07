@@ -19,7 +19,6 @@ Este projeto foi desenvolvido com:
 - Java 21
 - Spring Boot
 - PostgreSQL
-- MongoDB
 - Docker
 - Git e GitHub
 
@@ -60,7 +59,6 @@ This project was developed with:
 - Java 21
 - Spring Boot
 - PostgreSQL
-- MongoDB
 - Docker
 - Git and GitHub
 
