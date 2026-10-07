@@ -16,6 +16,12 @@ public interface AlbumRatingRepository extends JpaRepository<AlbumRating, String
 
     Optional<AlbumRating> findByUserIdAndAlbumKey(Long userId, String albumKey);
 
+    Optional<AlbumRating> findByIdAndUserId(String id, Long userId);
+
+    /** Usado pelo link público de compartilhamento: já traz o autor (precisa do username e das flags de privacidade). */
+    @Query("SELECT r FROM AlbumRating r JOIN FETCH r.usuario WHERE r.id = :id")
+    Optional<AlbumRating> findComUsuarioById(@Param("id") String id);
+
     List<AlbumRating> findByUserIdOrderByAtualizadoEmDesc(Long userId);
 
     Page<AlbumRating> findByUserId(Long userId, Pageable pageable);

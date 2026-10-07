@@ -2,15 +2,19 @@ package com.synfonia.musicas.controllers;
 
 import com.synfonia.musicas.dtos.request.AlbumRatingRequest;
 import com.synfonia.musicas.dtos.response.AlbumRatingResponse;
+import com.synfonia.musicas.dtos.response.PublicRatingShareResponse;
 import com.synfonia.musicas.security.UsuarioDetails;
 import com.synfonia.musicas.services.AlbumRatingService;
+import com.synfonia.musicas.services.PublicRatingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
 
@@ -21,6 +25,24 @@ import java.util.List;
 public class AlbumRatingController {
 
     private final AlbumRatingService albumRatingService;
+    private final PublicRatingService publicRatingService;
+
+    @Value("${app.public-url}")
+    private String publicUrl;
+
+    @Operation(summary = "Gera o link assinado de compartilhamento de uma avaliação do usuário atual")
+    @PostMapping("/{id}/compartilhamento")
+    public ResponseEntity<PublicRatingShareResponse> gerarLinkCompartilhamento(
+            @AuthenticationPrincipal UsuarioDetails userDetails,
+            @PathVariable String id) {
+        String token = publicRatingService.gerarTokenDoDono(id, userDetails.getId());
+        String url = UriComponentsBuilder.fromUriString(publicUrl.replaceAll("/+$", ""))
+                .path("/avaliacao/{id}")
+                .queryParam("token", token)
+                .buildAndExpand(id)
+                .toUriString();
+        return ResponseEntity.ok(new PublicRatingShareResponse(token, url));
+    }
 
     @Operation(summary = "Cria ou atualiza a avaliação do usuário para um álbum")
     @PostMapping
