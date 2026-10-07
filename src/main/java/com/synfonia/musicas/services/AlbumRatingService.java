@@ -64,7 +64,7 @@ public class AlbumRatingService {
         log.info("Avaliação de álbum excluída: usuário={}, albumKey={}", userId, albumKey);
     }
 
-    private AlbumRatingResponse toResponse(AlbumRating rating) {
+    public AlbumRatingResponse toResponse(AlbumRating rating) {
         return AlbumRatingResponse.builder()
                 .id(rating.getId())
                 .albumKey(rating.getAlbumKey())
@@ -77,6 +77,8 @@ public class AlbumRatingService {
                 .review(rating.getReview())
                 .criadoEm(rating.getCriadoEm())
                 .atualizadoEm(rating.getAtualizadoEm())
+                .oculto(Boolean.TRUE.equals(rating.getOculto()) ? Boolean.TRUE : null)
+                .ocultoMotivo(rating.getOcultoMotivo())
                 .build();
     }
 }

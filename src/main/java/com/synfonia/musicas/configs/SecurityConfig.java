@@ -105,6 +105,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/users/**", "/api/v1/usuarios/**").authenticated()
                 .requestMatchers("/api/v1/historico", "/api/v1/historico/**").authenticated()
                 .requestMatchers("/api/v1/playlists/**").authenticated()
+                .requestMatchers("/api/v1/community/**").authenticated()
+                .requestMatchers("/api/v1/admin/**").hasAuthority(com.synfonia.musicas.enums.Permissao.PAINEL_MODERACAO_ACESSAR.name())
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .anyRequest().authenticated()
             )

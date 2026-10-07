@@ -18,8 +18,14 @@ public class UsuarioResponse {
     private String personalName;
     private boolean showPersonalName;
     private boolean showSpotifyActivity;
+    private boolean perfilPublico;
+    private boolean showCurtidas;
+    private boolean showAvaliacoes;
     private java.time.LocalDateTime dataDesativacao;
-    private Usuario.Papel papel;
+    // RBAC: papéis efetivos (inclui USER) e permissões, para o front decidir o que exibir.
+    // A autorização real é sempre no backend.
+    private java.util.List<String> roles;
+    private java.util.List<String> permissoes;
     private boolean ativo;
     private java.time.LocalDateTime dataCriacao;
     private java.time.LocalDateTime ultimoLogin;

@@ -13,6 +13,8 @@ public interface UsuarioMapper {
     Usuario toEntity(UsuarioRequest request);
 
     @org.mapstruct.Mapping(target = "socialLinks", expression = "java(buildSocialLinks(entity))")
+    @org.mapstruct.Mapping(target = "roles", expression = "java(new java.util.ArrayList<>(entity.getNomesRoles()))")
+    @org.mapstruct.Mapping(target = "permissoes", expression = "java(new java.util.ArrayList<>(entity.getCodigosPermissoes()))")
     UsuarioResponse toResponse(Usuario entity);
 
     @Named("buildSocialLinks")
@@ -37,8 +39,12 @@ public interface UsuarioMapper {
                 .personalName(usuario.getPersonalName())
                 .showPersonalName(usuario.getShowPersonalName() != null ? usuario.getShowPersonalName() : true)
                 .showSpotifyActivity(usuario.getShowSpotifyActivity() != null ? usuario.getShowSpotifyActivity() : true)
+                .perfilPublico(usuario.getPerfilPublico() != null ? usuario.getPerfilPublico() : true)
+                .showCurtidas(usuario.getShowCurtidas() != null ? usuario.getShowCurtidas() : true)
+                .showAvaliacoes(usuario.getShowAvaliacoes() != null ? usuario.getShowAvaliacoes() : true)
                 .dataDesativacao(usuario.getDataDesativacao())
-                .papel(usuario.getPapel())
+                .roles(new java.util.ArrayList<>(usuario.getNomesRoles()))
+                .permissoes(new java.util.ArrayList<>(usuario.getCodigosPermissoes()))
                 .ativo(usuario.isAtivo())
                 .dataCriacao(usuario.getDataCriacao())
                 .ultimoLogin(usuario.getUltimoLogin())

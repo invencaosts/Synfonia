@@ -24,4 +24,7 @@ public class AlbumRatingResponse {
     private String review;
     private LocalDateTime criadoEm;
     private LocalDateTime atualizadoEm;
+    // Preenchidos só para o dono e para moderadores
+    private Boolean oculto;
+    private String ocultoMotivo;
 }
