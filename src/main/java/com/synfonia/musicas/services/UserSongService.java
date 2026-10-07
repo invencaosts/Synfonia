@@ -75,7 +75,7 @@ public class UserSongService {
 
     public Long removerMusicasPorFonte(MusicSource source) {
         Long userId = getLoggedUserId();
-        return userSongRepository.deleteByUserIdAndSource(userId, source);
+        return (long) userSongRepository.deleteByUserIdAndSource(userId, source);
     }
 
     public Page<UserSongResponse> listarMusicas(Long userId, Pageable pageable) {
@@ -145,16 +145,9 @@ public class UserSongService {
             throw new com.synfonia.musicas.exceptions.UsuarioNaoEncontradoException("Usuário não encontrado");
         }
         
-        java.util.List<UserSong> songs;
-        if (excludeSource != null) {
-            songs = userSongRepository.findTrackIdsByUserIdAndSourceNot(userId, excludeSource);
-        } else {
-            songs = userSongRepository.findTrackIdsByUserId(userId);
-        }
-        
-        return songs.stream()
-                .map(UserSong::getTrackId)
-                .toList();
+        return excludeSource != null
+                ? userSongRepository.findTrackIdsByUserIdAndSourceNot(userId, excludeSource)
+                : userSongRepository.findTrackIdsByUserId(userId);
     }
 
     public Long getLoggedUserId() {

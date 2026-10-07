@@ -2,12 +2,18 @@ package com.synfonia.musicas.entities;
 
 import com.synfonia.musicas.dtos.response.ItunesTrackResponse;
 import com.synfonia.musicas.enums.MusicSource;
+import jakarta.persistence.*;
 import lombok.*;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document(collection = "musicas") // Define explicitamente a coleção no Mongo
+/**
+ * Catálogo local de faixas (cache das fontes externas). O id é o id da faixa na fonte
+ * (iTunes numérico, YouTube/Spotify alfanumérico), atribuído pela aplicação.
+ */
+@Entity
+@Table(name = "musicas", indexes = {
+        @Index(name = "idx_musicas_nome", columnList = "nome"),
+        @Index(name = "idx_musicas_artista", columnList = "artista")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -16,18 +22,31 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class MusicEntity {
 
     @Id
+    @Column(length = 128)
     private String id;
 
-    @Indexed
+    @Column(columnDefinition = "TEXT")
     private String nome;
 
-    @Indexed
+    @Column(columnDefinition = "TEXT")
     private String artista;
+
+    @Column(columnDefinition = "TEXT")
     private String album;
+
     private Integer anoLancamento;
+
+    @Column(columnDefinition = "TEXT")
     private String previewUrl;
+
+    @Column(columnDefinition = "TEXT")
     private String capaUrl;
+
+    @Column(columnDefinition = "TEXT")
     private String uri;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 32)
     private MusicSource source;
 
     public MusicEntity(ItunesTrackResponse dto, String trackId) {

@@ -55,6 +55,9 @@ public class PlaylistService {
 
         if (playlistDetails.getNome() != null) playlist.setNome(playlistDetails.getNome());
         if (playlistDetails.getVibe() != null) playlist.setVibe(playlistDetails.getVibe());
+        if (playlistDetails.isPublico() && Boolean.TRUE.equals(playlist.getBloqueadaModeracao())) {
+            throw new IllegalStateException("Esta playlist foi bloqueada pela moderação e não pode ficar pública.");
+        }
         playlist.setPublico(playlistDetails.isPublico());
         if (playlistDetails.getCapaUrl() != null) playlist.setCapaUrl(playlistDetails.getCapaUrl());
 
@@ -63,10 +66,6 @@ public class PlaylistService {
 
     public List<Playlist> findAllByUserId(Long userId) {
         return playlistRepository.findByUserId(userId);
-    }
-
-    public List<Playlist> findPublicByUserId(Long userId) {
-        return playlistRepository.findByUserIdAndPublicoTrue(userId);
     }
 
     @SuppressWarnings("null")

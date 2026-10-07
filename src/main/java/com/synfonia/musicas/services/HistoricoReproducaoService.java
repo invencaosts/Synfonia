@@ -39,17 +39,15 @@ public class HistoricoReproducaoService {
             // Continuamos mesmo sem pré-salvar, para não quebrar a experiência do usuário
         }
 
-        // Se já existir no histórico, remove a antiga para colocar no topo
-        removerDoHistorico(userId, trackId);
+        // Uma linha por (usuário, faixa): tocar de novo só atualiza a data, o que leva a faixa ao topo
+        HistoricoReproducao historico = historicoRepository.findByUserIdAndTrackId(userId, trackId)
+                .orElseGet(() -> HistoricoReproducao.builder()
+                        .userId(userId)
+                        .trackId(trackId)
+                        .build());
+        historico.setDataReproducao(LocalDateTime.now());
 
-        @SuppressWarnings("null")
-        HistoricoReproducao novoHistorico = HistoricoReproducao.builder()
-                .userId(userId)
-                .trackId(trackId)
-                .dataReproducao(LocalDateTime.now())
-                .build();
-
-        historicoRepository.save(java.util.Objects.requireNonNull(novoHistorico));
+        historicoRepository.save(java.util.Objects.requireNonNull(historico));
 
     }
 
