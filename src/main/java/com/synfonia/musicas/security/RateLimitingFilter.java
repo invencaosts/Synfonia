@@ -42,6 +42,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         // Se for login ou registro, usamos o bucket restrito
         if (path.contains("/auth/login") || path.contains("/auth/register")) {
             bucket = rateLimitingService.resolveLoginBucket(ip);
+        } else if (path.endsWith("/api/v1/community/users")) {
+            // Busca de usuários tem limite próprio contra varredura de usernames
+            bucket = rateLimitingService.resolveSearchBucket(ip);
         } else {
             // Outros endpoints usam o bucket geral
             bucket = rateLimitingService.resolveApiBucket(ip);

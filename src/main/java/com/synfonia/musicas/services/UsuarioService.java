@@ -78,6 +78,18 @@ public class UsuarioService {
             usuario.setShowSpotifyActivity((Boolean) profileData.get("showSpotifyActivity"));
         }
         
+        if (profileData.containsKey("perfilPublico")) {
+            usuario.setPerfilPublico(asBoolean(profileData.get("perfilPublico")));
+        }
+
+        if (profileData.containsKey("showCurtidas")) {
+            usuario.setShowCurtidas(asBoolean(profileData.get("showCurtidas")));
+        }
+
+        if (profileData.containsKey("showAvaliacoes")) {
+            usuario.setShowAvaliacoes(asBoolean(profileData.get("showAvaliacoes")));
+        }
+
         if (profileData.containsKey("username")) {
             String newUsername = (String) profileData.get("username");
             if (newUsername != null && !newUsername.equals(usuario.getUsername())) {
@@ -120,6 +132,12 @@ public class UsuarioService {
         }
 
         return usuarioRepository.save(usuario);
+    }
+
+    private Boolean asBoolean(Object value) {
+        if (value instanceof Boolean b) return b;
+        if (value instanceof String str) return Boolean.parseBoolean(str.trim());
+        throw new IllegalArgumentException("Valor booleano inválido: " + value);
     }
 
     private String asString(Object value) {

@@ -3,7 +3,10 @@ package com.synfonia.musicas.controllers;
 import com.synfonia.musicas.dtos.request.MusicSaveRequest;
 import com.synfonia.musicas.dtos.request.PlaylistRequest;
 import com.synfonia.musicas.dtos.request.SpotifyImportDataRequest;
+import com.synfonia.musicas.dtos.response.PublicPlaylistResponse;
 import com.synfonia.musicas.entities.Playlist;
+import com.synfonia.musicas.security.UsuarioDetails;
+import com.synfonia.musicas.services.CommunityService;
 import com.synfonia.musicas.services.PlaylistService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -13,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,6 +28,7 @@ import java.util.List;
 public class PlaylistController {
 
     private final PlaylistService playlistService;
+    private final CommunityService communityService;
 
     @Operation(summary = "Cria uma nova playlist", description = "Cria uma playlist com nome, vibe, privacidade e capa (Base64).")
     @ApiResponses(value = {
@@ -87,9 +92,10 @@ public class PlaylistController {
     })
 
     @GetMapping("/public/{userId}")
-    public ResponseEntity<List<Playlist>> getPublic(
+    public ResponseEntity<List<PublicPlaylistResponse>> getPublic(
+            @AuthenticationPrincipal UsuarioDetails userDetails,
             @Parameter(description = "ID do usuário dono do perfil") @PathVariable Long userId) {
-        return ResponseEntity.ok(playlistService.findPublicByUserId(userId));
+        return ResponseEntity.ok(communityService.listarPlaylistsPorId(userId, userDetails.getId()));
     }
 
     @Operation(summary = "Adicionar uma música à playlist")
@@ -103,7 +109,7 @@ public class PlaylistController {
 
     @PostMapping("/{playlistId}/tracks")
     public ResponseEntity<Playlist> addTrack(
-            @Parameter(description = "ID da playlist (MongoDB)") @PathVariable String playlistId,
+            @Parameter(description = "ID da playlist") @PathVariable String playlistId,
             @RequestBody MusicSaveRequest request) {
         return ResponseEntity.ok(playlistService.addTrack(playlistId, request));
     }
@@ -111,7 +117,7 @@ public class PlaylistController {
     @Operation(summary = "Adicionar várias músicas à playlist (Batch)")
     @PostMapping("/{playlistId}/tracks/batch")
     public ResponseEntity<Playlist> addTracks(
-            @Parameter(description = "ID da playlist (MongoDB)") @PathVariable String playlistId,
+            @Parameter(description = "ID da playlist") @PathVariable String playlistId,
             @RequestBody List<MusicSaveRequest> requests) {
         return ResponseEntity.ok(playlistService.addTracks(playlistId, requests));
     }
@@ -133,7 +139,7 @@ public class PlaylistController {
 
     @DeleteMapping("/{playlistId}/tracks/{trackId}")
     public ResponseEntity<Playlist> removeTrack(
-            @Parameter(description = "ID da playlist (MongoDB)") @PathVariable String playlistId,
+            @Parameter(description = "ID da playlist") @PathVariable String playlistId,
             @Parameter(description = "ID da música") @PathVariable String trackId) {
         return ResponseEntity.ok(playlistService.removeTrack(playlistId, trackId));
     }

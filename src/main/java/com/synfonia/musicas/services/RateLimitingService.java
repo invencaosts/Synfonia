@@ -14,6 +14,7 @@ public class RateLimitingService {
     // Cache de buckets por IP
     private final Map<String, Bucket> loginBuckets = new ConcurrentHashMap<>();
     private final Map<String, Bucket> apiBuckets = new ConcurrentHashMap<>();
+    private final Map<String, Bucket> searchBuckets = new ConcurrentHashMap<>();
 
     /**
      * Retorna o balde para o endpoint de Login (5 req/min)
@@ -27,6 +28,23 @@ public class RateLimitingService {
      */
     public Bucket resolveApiBucket(String ip) {
         return apiBuckets.computeIfAbsent(ip, this::createApiBucket);
+    }
+
+    /**
+     * Retorna o balde para a busca de usuários da comunidade (60 req/min).
+     * Evita varredura em massa de usernames.
+     */
+    public Bucket resolveSearchBucket(String ip) {
+        return searchBuckets.computeIfAbsent(ip, this::createSearchBucket);
+    }
+
+    private Bucket createSearchBucket(String key) {
+        return Bucket.builder()
+                .addLimit(Bandwidth.builder()
+                        .capacity(60)
+                        .refillGreedy(60, Duration.ofMinutes(1))
+                        .build())
+                .build();
     }
 
     private Bucket createLoginBucket(String key) {
