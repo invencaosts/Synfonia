@@ -74,6 +74,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (email != null && isNotAuthenticated) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
+                // Conta suspensa/desativada perde acesso na hora, mesmo com token ainda válido
+                if (!userDetails.isEnabled() || !userDetails.isAccountNonLocked()) {
+                    log.info("[AuthFilter] Acesso negado para conta suspensa ou inativa: {}", email);
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
                 if (jwtUtil.isTokenValid(token, email)) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
@@ -84,6 +91,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
+        } catch (org.springframework.security.core.userdetails.UsernameNotFoundException e) {
+            // Token de conta apagada/desativada: segue sem autenticação
+            log.info("[AuthFilter] Token de usuário inexistente ou inativo");
         } catch (JwtException | IllegalArgumentException e) {
             log.warn("Token JWT inválido ou malformado: {}", e.getMessage());
             // Não bloqueamos aqui para permitir que rotas públicas funcionem mesmo com token inválido

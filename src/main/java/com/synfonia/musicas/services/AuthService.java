@@ -15,7 +15,6 @@ import com.synfonia.musicas.repositories.UsuarioRepository;
 import com.synfonia.musicas.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,12 +34,6 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final UsuarioMapper usuarioMapper;
-
-    @Value("${spring.security.user.name}")
-    private String adminEmail;
-
-    @Value("${ADMIN_PASSWORD:#{null}}")
-    private String adminPassword;
 
     public UsuarioResponse register(UsuarioRequest request) {
         log.info("Registro de novo usuário: {}", request.getEmail());
@@ -69,10 +62,8 @@ public class AuthService {
         usuario.setDisplayName(request.getDisplayName()); 
         usuario.setAtivo(true);
         usuario.setPapel(Usuario.Papel.USER);
-
-        if (adminEmail != null && adminEmail.equals(request.getEmail())) {
-            usuario.setPapel(Usuario.Papel.ADMIN);
-        }
+        // Todo cadastro nasce só com USER (implícito). Papéis elevados vêm exclusivamente do
+        // UsuariosSeeder ou de quem tem PAPEIS_GERENCIAR — nunca do e-mail informado no cadastro.
 
         Usuario usuarioSalvo = usuarioRepository.save(usuario);
         return usuarioMapper.toResponse(usuarioSalvo);
@@ -106,6 +97,13 @@ public class AuthService {
             // Incrementar tentativas falhas e aplicar bloqueio progressivo
             incrementarTentativasEBloquear(usuario);
             throw new CredenciaisInvalidasException();
+        }
+
+        // Só depois da senha correta, para não revelar a terceiros que a conta existe e está suspensa
+        if (usuario.isBanidoAgora()) {
+            String ate = usuario.getBanidoAte() == null ? "por tempo indeterminado"
+                    : "até " + usuario.getBanidoAte().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
+            throw new UsuarioBloqueadoException("Conta suspensa pela moderação " + ate + ".");
         }
 
         // Login bem-sucedido: resetar tentativas
@@ -166,7 +164,7 @@ public class AuthService {
     }
 
     @SuppressWarnings("null")
-    private void validatePassword(String password, String email) {
+    public static void validatePassword(String password, String email) {
         // Mínimo 8 caracteres
         if (password.length() < 8) {
             throw new SenhaInvalidaException("Senha deve ter pelo menos 8 caracteres");
