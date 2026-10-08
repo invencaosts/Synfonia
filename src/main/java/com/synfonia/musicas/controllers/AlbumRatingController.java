@@ -36,10 +36,10 @@ public class AlbumRatingController {
             @AuthenticationPrincipal UsuarioDetails userDetails,
             @PathVariable String id) {
         String token = publicRatingService.gerarTokenDoDono(id, userDetails.getId());
+        String codigo = publicRatingService.gerarCodigoDoDono(id, userDetails.getId());
         String url = UriComponentsBuilder.fromUriString(publicUrl.replaceAll("/+$", ""))
-                .path("/avaliacao/{id}")
-                .queryParam("token", token)
-                .buildAndExpand(id)
+                .path("/a/{codigo}")
+                .buildAndExpand(codigo)
                 .toUriString();
         return ResponseEntity.ok(new PublicRatingShareResponse(token, url));
     }

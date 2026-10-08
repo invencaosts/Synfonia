@@ -11,7 +11,10 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "album_ratings",
-        uniqueConstraints = @UniqueConstraint(name = "uk_album_ratings_usuario_album", columnNames = {"user_id", "album_key"}),
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_album_ratings_usuario_album", columnNames = {"user_id", "album_key"}),
+                @UniqueConstraint(name = "uk_album_ratings_codigo_curto", columnNames = {"codigo_curto"})
+        },
         indexes = @Index(name = "idx_album_ratings_usuario_data", columnList = "user_id, atualizado_em"))
 @Getter
 @Setter
@@ -73,4 +76,8 @@ public class AlbumRating {
     private Long ocultoPor;
 
     private LocalDateTime ocultoEm;
+
+    // Código do link curto de compartilhamento (/a/{codigo}); gerado no primeiro compartilhamento
+    @Column(name = "codigo_curto", length = 16)
+    private String codigoCurto;
 }

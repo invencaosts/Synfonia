@@ -4,6 +4,7 @@ import com.synfonia.musicas.entities.AlbumRating;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -21,6 +22,18 @@ public interface AlbumRatingRepository extends JpaRepository<AlbumRating, String
     /** Usado pelo link público de compartilhamento: já traz o autor (precisa do username e das flags de privacidade). */
     @Query("SELECT r FROM AlbumRating r JOIN FETCH r.usuario WHERE r.id = :id")
     Optional<AlbumRating> findComUsuarioById(@Param("id") String id);
+
+    @Query("SELECT r FROM AlbumRating r JOIN FETCH r.usuario WHERE r.codigoCurto = :codigo")
+    Optional<AlbumRating> findComUsuarioByCodigoCurto(@Param("codigo") String codigo);
+
+    boolean existsByCodigoCurto(String codigoCurto);
+
+    @Query("SELECT r.codigoCurto FROM AlbumRating r WHERE r.id = :id")
+    Optional<String> findCodigoCurtoById(@Param("id") String id);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE AlbumRating r SET r.codigoCurto = :codigo WHERE r.id = :id AND r.codigoCurto IS NULL")
+    int definirCodigoCurtoSeVazio(@Param("id") String id, @Param("codigo") String codigo);
 
     List<AlbumRating> findByUserIdOrderByAtualizadoEmDesc(Long userId);
 

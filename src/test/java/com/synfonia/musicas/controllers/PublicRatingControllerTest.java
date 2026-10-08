@@ -77,4 +77,30 @@ class PublicRatingControllerTest {
         assertThat(resposta.getHeaders().getCacheControl()).isEqualTo("no-store");
         assertThat(resposta.getBody()).isEqualTo("<html>ok</html>");
     }
+
+    @Test
+    void paginaCurtaRenderizaComTokenParaOApp() {
+        String codigo = "Abc12345";
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/a/" + codigo);
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        PublicAlbumRatingResponse rating = PublicAlbumRatingResponse.builder().id(ID).build();
+        when(publicRatingService.buscarPorCodigo(codigo)).thenReturn(rating);
+        when(publicRatingService.gerarToken(ID)).thenReturn(TOKEN);
+        when(publicRatingService.renderizarPagina(rating, "http://localhost/a/" + codigo, TOKEN))
+                .thenReturn("<html>ok</html>");
+
+        var resposta = controller.paginaCurta(codigo);
+
+        assertThat(resposta.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resposta.getHeaders().getCacheControl()).isEqualTo("no-store");
+        assertThat(resposta.getBody()).isEqualTo("<html>ok</html>");
+    }
+
+    @Test
+    void codigoInexistenteRetorna404() {
+        when(publicRatingService.buscarPorCodigo("Inexiste"))
+                .thenThrow(new AlbumRatingNotFoundException("Avaliação não encontrada ou não está pública."));
+
+        assertThat(controller.buscarPorCodigo("Inexiste").getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
 }

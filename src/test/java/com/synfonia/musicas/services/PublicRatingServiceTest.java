@@ -16,6 +16,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -165,5 +167,66 @@ class PublicRatingServiceTest {
         rating.setCapaUrl("https://x/a.jpg') ; background:url('https://evil");
         String quebraCss = publicRatingService.renderizarPagina(publicRatingService.buscar(ID, token), "u", token);
         assertThat(quebraCss).doesNotContain("evil");
+    }
+
+    @Test
+    void codigoCurtoEhGeradoUmaVezEReaproveitado() {
+        when(albumRatingRepository.findByIdAndUserId(ID, 1L)).thenReturn(Optional.of(rating));
+        when(albumRatingRepository.existsByCodigoCurto(anyString())).thenReturn(false);
+        when(albumRatingRepository.definirCodigoCurtoSeVazio(eq(ID), anyString())).thenReturn(1);
+
+        String codigo = publicRatingService.gerarCodigoDoDono(ID, 1L);
+        assertThat(codigo).matches("[0-9A-Za-z]{8}");
+
+        rating.setCodigoCurto("Abc12345");
+        assertThat(publicRatingService.gerarCodigoDoDono(ID, 1L)).isEqualTo("Abc12345");
+        verify(albumRatingRepository).definirCodigoCurtoSeVazio(eq(ID), anyString());
+    }
+
+    @Test
+    void codigoCurtoConcorrenteFicaComOPrimeiroGravado() {
+        when(albumRatingRepository.findByIdAndUserId(ID, 1L)).thenReturn(Optional.of(rating));
+        when(albumRatingRepository.existsByCodigoCurto(anyString())).thenReturn(false);
+        when(albumRatingRepository.definirCodigoCurtoSeVazio(eq(ID), anyString())).thenReturn(0);
+        when(albumRatingRepository.findCodigoCurtoById(ID)).thenReturn(Optional.of("Primeiro"));
+
+        assertThat(publicRatingService.gerarCodigoDoDono(ID, 1L)).isEqualTo("Primeiro");
+    }
+
+    @Test
+    void codigoCurtoNaoEhGeradoParaAvaliacaoDeOutroUsuario() {
+        when(albumRatingRepository.findByIdAndUserId(ID, 2L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> publicRatingService.gerarCodigoDoDono(ID, 2L))
+                .isInstanceOf(AlbumRatingNotFoundException.class);
+        verify(albumRatingRepository, never()).definirCodigoCurtoSeVazio(anyString(), anyString());
+    }
+
+    @Test
+    void buscarPorCodigoRespeitaVisibilidadeEFormato() {
+        when(albumRatingRepository.findComUsuarioByCodigoCurto("Abc12345")).thenReturn(Optional.of(rating));
+        assertThat(publicRatingService.buscarPorCodigo("Abc12345").getId()).isEqualTo(ID);
+
+        autor.setPerfilPublico(false);
+        assertThatThrownBy(() -> publicRatingService.buscarPorCodigo("Abc12345"))
+                .isInstanceOf(AlbumRatingNotFoundException.class);
+
+        assertThatThrownBy(() -> publicRatingService.buscarPorCodigo("curto"))
+                .isInstanceOf(AlbumRatingNotFoundException.class);
+        assertThatThrownBy(() -> publicRatingService.buscarPorCodigo("Abc-1234"))
+                .isInstanceOf(AlbumRatingNotFoundException.class);
+        verify(albumRatingRepository, never()).findComUsuarioByCodigoCurto("curto");
+    }
+
+    @Test
+    void tokenCompletoDeLinkAntigoContinuaValido() throws Exception {
+        javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
+        mac.init(new javax.crypto.spec.SecretKeySpec(
+                "segredo-de-teste-com-tamanho-suficiente".getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256"));
+        String antigo = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(
+                mac.doFinal(("synfonia:public-rating:" + ID).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+        assertThat(publicRatingService.tokenValido(ID, antigo)).isTrue();
+        assertThat(publicRatingService.tokenValido(ID, antigo.substring(0, 20))).isFalse();
     }
 }

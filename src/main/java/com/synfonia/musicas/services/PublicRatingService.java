@@ -14,9 +14,12 @@ import org.springframework.web.util.UriUtils;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Locale;
+import java.util.Optional;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -38,10 +41,18 @@ public class PublicRatingService {
     private static final String NAO_ENCONTRADA = "Avaliação não encontrada ou não está pública.";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
     private static final String TOKEN_CONTEXT = "synfonia:public-rating:";
+    // Assinatura truncada: 64 bits bastam contra chute online e deixam o link curto.
+    private static final int TAMANHO_ASSINATURA = 8;
+    private static final int TAMANHO_ASSINATURA_LEGADA = 32;
+    // Código do link curto (/a/{codigo}): 8 caracteres base62 aleatórios ≈ 47 bits, o próprio código é o segredo
+    private static final String BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    private static final int TAMANHO_CODIGO = 8;
+    private static final int TENTATIVAS_CODIGO = 5;
     private static final DateTimeFormatter DATA = DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.forLanguageTag("pt-BR"));
 
     private final AlbumRatingRepository albumRatingRepository;
     private final byte[] signingSecret;
+    private final SecureRandom random = new SecureRandom();
 
     public PublicRatingService(
             AlbumRatingRepository albumRatingRepository,
@@ -65,12 +76,49 @@ public class PublicRatingService {
         return gerarToken(id);
     }
 
+    /**
+     * Código do link curto da avaliação do usuário autenticado. Gerado uma vez só (no primeiro
+     * compartilhamento) e reaproveitado depois, para o link/QR code não mudar a cada geração.
+     */
+    @Transactional
+    public String gerarCodigoDoDono(String id, Long userId) {
+        AlbumRating rating = albumRatingRepository.findByIdAndUserId(id, userId)
+                .filter(PublicRatingService::visivel)
+                .orElseThrow(() -> new AlbumRatingNotFoundException(NAO_ENCONTRADA));
+        if (rating.getCodigoCurto() != null) {
+            return rating.getCodigoCurto();
+        }
+        for (int i = 0; i < TENTATIVAS_CODIGO; i++) {
+            String codigo = novoCodigo();
+            if (albumRatingRepository.existsByCodigoCurto(codigo)) continue;
+            // UPDATE condicional: em dois compartilhamentos simultâneos, vale o primeiro código gravado
+            if (albumRatingRepository.definirCodigoCurtoSeVazio(id, codigo) == 0) {
+                return albumRatingRepository.findCodigoCurtoById(id)
+                        .orElseThrow(() -> new AlbumRatingNotFoundException(NAO_ENCONTRADA));
+            }
+            return codigo;
+        }
+        throw new IllegalStateException("Não foi possível gerar um código curto único");
+    }
+
     @Transactional(readOnly = true)
     public PublicAlbumRatingResponse buscar(String id, String token) {
         if (!tokenValido(id, token)) {
             throw new AlbumRatingNotFoundException(NAO_ENCONTRADA);
         }
-        AlbumRating rating = albumRatingRepository.findComUsuarioById(id)
+        return paraResposta(albumRatingRepository.findComUsuarioById(id));
+    }
+
+    @Transactional(readOnly = true)
+    public PublicAlbumRatingResponse buscarPorCodigo(String codigo) {
+        if (!codigoValido(codigo)) {
+            throw new AlbumRatingNotFoundException(NAO_ENCONTRADA);
+        }
+        return paraResposta(albumRatingRepository.findComUsuarioByCodigoCurto(codigo));
+    }
+
+    private PublicAlbumRatingResponse paraResposta(Optional<AlbumRating> encontrada) {
+        AlbumRating rating = encontrada
                 .filter(PublicRatingService::visivel)
                 .orElseThrow(() -> new AlbumRatingNotFoundException(NAO_ENCONTRADA));
         Usuario autor = rating.getUsuario();
@@ -91,8 +139,21 @@ public class PublicRatingService {
                 .build();
     }
 
-    String gerarToken(String id) {
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(assinar(id));
+    String novoCodigo() {
+        StringBuilder codigo = new StringBuilder(TAMANHO_CODIGO);
+        for (int i = 0; i < TAMANHO_CODIGO; i++) {
+            codigo.append(BASE62.charAt(random.nextInt(BASE62.length())));
+        }
+        return codigo.toString();
+    }
+
+    static boolean codigoValido(String codigo) {
+        return codigo != null && codigo.length() == TAMANHO_CODIGO && codigo.chars().allMatch(c -> BASE62.indexOf(c) >= 0);
+    }
+
+    public String gerarToken(String id) {
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(Arrays.copyOf(assinar(id), TAMANHO_ASSINATURA));
     }
 
     boolean tokenValido(String id, String token) {
@@ -101,7 +162,11 @@ public class PublicRatingService {
         }
         try {
             byte[] informado = Base64.getUrlDecoder().decode(token);
-            return MessageDigest.isEqual(assinar(id), informado);
+            // Aceita também o token completo dos links gerados antes do encurtamento
+            if (informado.length != TAMANHO_ASSINATURA && informado.length != TAMANHO_ASSINATURA_LEGADA) {
+                return false;
+            }
+            return MessageDigest.isEqual(Arrays.copyOf(assinar(id), informado.length), informado);
         } catch (IllegalArgumentException e) {
             return false;
         }

@@ -109,7 +109,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/admin/**").hasAuthority(com.synfonia.musicas.enums.Permissao.PAINEL_MODERACAO_ACESSAR.name())
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 // Link público da imagem de compartilhamento de avaliação (+ verificação de App Links)
-                .requestMatchers(HttpMethod.GET, "/api/v1/publico/avaliacoes/*", "/avaliacao/*", "/.well-known/assetlinks.json").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/publico/avaliacoes/*", "/api/v1/publico/avaliacoes/codigo/*", "/avaliacao/*", "/a/*", "/.well-known/assetlinks.json").permitAll()
                 .anyRequest().authenticated()
             )
             .authenticationProvider(authenticationProvider())

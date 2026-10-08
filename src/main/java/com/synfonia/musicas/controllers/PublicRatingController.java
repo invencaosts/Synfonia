@@ -65,18 +65,46 @@ public class PublicRatingController {
         try {
             PublicAlbumRatingResponse rating = publicRatingService.buscar(id, token);
             String url = ServletUriComponentsBuilder.fromCurrentRequest().build().toUriString();
+            return html(HttpStatus.OK, publicRatingService.renderizarPagina(rating, url, token));
+        } catch (AlbumRatingNotFoundException e) {
+            return html(HttpStatus.NOT_FOUND, publicRatingService.renderizarNaoEncontrada());
+        }
+    }
+
+    @Operation(summary = "Avaliação pública pelo código do link curto (para o app abrir /a/{codigo})")
+    @GetMapping("/api/v1/publico/avaliacoes/codigo/{codigo}")
+    public ResponseEntity<PublicAlbumRatingResponse> buscarPorCodigo(@PathVariable String codigo) {
+        try {
             return ResponseEntity.ok()
                     .cacheControl(CacheControl.noStore())
-                    .header("Content-Security-Policy", CSP)
-                    .contentType(MediaType.parseMediaType("text/html;charset=UTF-8"))
-                    .body(publicRatingService.renderizarPagina(rating, url, token));
+                    .body(publicRatingService.buscarPorCodigo(codigo));
         } catch (AlbumRatingNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            return ResponseEntity.notFound()
                     .cacheControl(CacheControl.noStore())
-                    .header("Content-Security-Policy", CSP)
-                    .contentType(MediaType.parseMediaType("text/html;charset=UTF-8"))
-                    .body(publicRatingService.renderizarNaoEncontrada());
+                    .build();
         }
+    }
+
+    @Operation(summary = "Página HTML do link curto da avaliação (destino do QR code da imagem compartilhada)")
+    @GetMapping(value = "/a/{codigo}", produces = MediaType.TEXT_HTML_VALUE)
+    public ResponseEntity<String> paginaCurta(@PathVariable String codigo) {
+        try {
+            PublicAlbumRatingResponse rating = publicRatingService.buscarPorCodigo(codigo);
+            String url = ServletUriComponentsBuilder.fromCurrentRequest().build().toUriString();
+            // "Abrir no app" segue no formato longo: APKs antigos só conhecem synfonia://avaliacao/{id}?token=
+            String token = publicRatingService.gerarToken(rating.getId());
+            return html(HttpStatus.OK, publicRatingService.renderizarPagina(rating, url, token));
+        } catch (AlbumRatingNotFoundException e) {
+            return html(HttpStatus.NOT_FOUND, publicRatingService.renderizarNaoEncontrada());
+        }
+    }
+
+    private static ResponseEntity<String> html(HttpStatus status, String corpo) {
+        return ResponseEntity.status(status)
+                .cacheControl(CacheControl.noStore())
+                .header("Content-Security-Policy", CSP)
+                .contentType(MediaType.parseMediaType("text/html;charset=UTF-8"))
+                .body(corpo);
     }
 
     @GetMapping(value = "/.well-known/assetlinks.json", produces = MediaType.APPLICATION_JSON_VALUE)
