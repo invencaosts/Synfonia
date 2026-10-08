@@ -20,6 +20,7 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f 2026-10-07_00_schema_base.sql
 | 2 | `2026-10-07_rbac.sql` | Papéis por usuário, suspensão e auditoria de moderação |
 | 3 | `2026-10-07_mongo_para_postgres.sql` | Tabelas que saíram do MongoDB + FKs com `ON DELETE CASCADE` |
 | 4 | `mongo_para_postgres.py` | Copia os dados do MongoDB para as tabelas do passo 3 (uma vez só) |
+| 5 | `2026-10-08_link_curto_avaliacao.sql` | Coluna `codigo_curto` do link curto de avaliação (`/a/{codigo}`) |
 
 ## Roteiro de produção (fim do MongoDB)
 

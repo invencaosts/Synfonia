@@ -63,6 +63,7 @@ CREATE TABLE public.album_ratings (
     source character varying(32),
     titulo character varying(200),
     user_id bigint NOT NULL,
+    codigo_curto character varying(16),
     CONSTRAINT album_ratings_source_check CHECK (((source)::text = ANY ((ARRAY['SPOTIFY'::character varying, 'ITUNES'::character varying, 'YOUTUBE_MUSIC'::character varying])::text[])))
 );
 
@@ -351,6 +352,14 @@ ALTER TABLE ONLY public.password_reset_tokens
 
 ALTER TABLE ONLY public.album_ratings
     ADD CONSTRAINT uk_album_ratings_usuario_album UNIQUE (user_id, album_key);
+
+
+--
+-- Name: album_ratings uk_album_ratings_codigo_curto; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.album_ratings
+    ADD CONSTRAINT uk_album_ratings_codigo_curto UNIQUE (codigo_curto);
 
 
 --
